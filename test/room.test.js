@@ -52,7 +52,9 @@ test('a peer that was offline catches up on reconnect', async (t) => {
   const key = crypto.randomBytes(32)
   const bobStorage = await t.tmp()
 
-  const alice = await createPeer(t, bootstrap, key, 'Alice')
+  const aliceStorage = await t.tmp()
+
+  let alice = await createPeer(t, bootstrap, key, 'Alice', aliceStorage)
   let bob = await createPeer(t, bootstrap, key, 'Bob', bobStorage)
 
   await alice.room.send('m1', 'one')
@@ -76,6 +78,11 @@ test('a peer that was offline catches up on reconnect', async (t) => {
 
   await until(() => alice.room.syncedLength === 3)
   t.pass('pending messages become synced after the peer returns')
+
+  await alice.close()
+  await bob.close()
+  alice = await createPeer(t, bootstrap, key, 'Alice', aliceStorage)
+  t.is(alice.room.syncedLength, 3, 'synced state is remembered across a restart')
 })
 
 test('messages reach a peer that never met their author', async (t) => {

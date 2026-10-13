@@ -27,7 +27,7 @@ export default function Room({ state, name, online, onSend, onLeave, onRename })
             will sync when a peer is here.
           </p>
         )}
-        <Composer onSend={onSend} alone={status !== 'connected'} />
+        <Composer onSend={onSend} />
       </main>
 
       <aside className='side' aria-label='Room details'>

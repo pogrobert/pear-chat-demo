@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 
-export default function Composer({ onSend, alone }) {
+export default function Composer({ onSend }) {
   const [text, setText] = useState('')
   const input = useRef(null)
 
@@ -33,9 +33,7 @@ export default function Composer({ onSend, alone }) {
         onChange={onChange}
         onKeyDown={onKeyDown}
         maxLength={4000}
-        placeholder={
-          alone ? 'Write a message. It will be delivered when a peer is here.' : 'Write a message'
-        }
+        placeholder='Write a message'
         aria-label='Message'
         aria-describedby='composer-hint'
         autoFocus
