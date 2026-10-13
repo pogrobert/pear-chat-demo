@@ -33,7 +33,7 @@ module.exports = class Room extends ReadyResource {
     this.discovery = null
 
     this.writers = new Map() // hex core key -> { core, read, target, stream }
-    this.peers = new Map() // connection -> { channel, hello, id, name }
+    this.peers = new Map() // connection -> { channel, hello, id, name, wasHere }
     this.status = 'starting' // -> 'discovering' -> 'alone' | 'connected'
     this.catchup = { remaining: 0, total: 0 }
 
@@ -144,7 +144,9 @@ module.exports = class Room extends ReadyResource {
     })
     if (channel === null) return // already open on this connection
 
-    const peer = { channel, hello: null, id: null, name: null }
+    // Peers we connect to during our own first discovery were here before us,
+    // so they are listed without a "joined" notice.
+    const peer = { channel, hello: null, id: null, name: null, wasHere: !this._discovered }
     peer.hello = channel.addMessage({
       encoding: c.json,
       onmessage: (message) => this._onhello(peer, message)
@@ -196,7 +198,7 @@ module.exports = class Room extends ReadyResource {
     // never online at the same time as them.
     if (learned) this._broadcastHello()
     if (joined || renamed) {
-      this.emit('peers', this.listPeers(), joined ? { joined: peer.name } : {})
+      this.emit('peers', this.listPeers(), joined && !peer.wasHere ? { joined: peer.name } : {})
     }
     this._setStatus()
     this._updateCatchup()

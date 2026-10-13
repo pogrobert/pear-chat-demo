@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, clipboard } = require('electron')
 const os = require('os')
 const path = require('path')
 const PearRuntime = require('pear-runtime')
@@ -29,6 +29,14 @@ const pearStore = cmd.flags.storage
 const updates = cmd.flags.updates
 
 if (pearStore) app.setPath('userData', pearStore)
+
+if (!app.isPackaged) {
+  // In dev, skip the macOS keychain prompt each extra instance would trigger.
+  app.commandLine.appendSwitch('use-mock-keychain')
+  // Lets test/e2e.js drive real app windows over the DevTools protocol.
+  const debugPort = process.env.PEAR_CHAT_DEBUG_PORT
+  if (debugPort) app.commandLine.appendSwitch('remote-debugging-port', debugPort)
+}
 
 ipcMain.on('pkg', (evt) => {
   evt.returnValue = pkg
@@ -81,9 +89,11 @@ function getWorker(specifier) {
   const pipe = new FramedStream(worker)
 
   function sendWorkerStdout(data) {
+    process.stdout.write(data)
     sendToAll('pear:worker:stdout:' + specifier, data)
   }
   function sendWorkerStderr(data) {
+    process.stderr.write(data)
     sendToAll('pear:worker:stderr:' + specifier, data)
   }
   function sendWorkerIPC(data) {
@@ -114,8 +124,12 @@ function getWorker(specifier) {
 
 async function createWindow() {
   const win = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 920,
+    height: 680,
+    minWidth: 420,
+    minHeight: 480,
+    title: appName,
+    backgroundColor: '#f7f6f3',
     webPreferences: {
       preload: path.join(__dirname, '..', 'electron', 'preload.js'),
       sandbox: true,
@@ -132,7 +146,7 @@ async function createWindow() {
     return
   }
 
-  await win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'))
+  await win.loadFile(path.join(__dirname, '..', 'renderer', 'dist', 'index.html'))
 }
 
 ipcMain.handle('pear:applyUpdate', () => {
@@ -152,6 +166,7 @@ ipcMain.handle('pear:applyUpdate', () => {
     pipe.write('pear:applyUpdate')
   })
 })
+ipcMain.handle('clipboard:write', (evt, text) => clipboard.writeText(text))
 ipcMain.handle('pear:startWorker', (evt, filename) => {
   getWorker(filename)
   return true

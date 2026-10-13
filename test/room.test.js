@@ -35,6 +35,8 @@ test('two peers find each other, chat, and see presence', async (t) => {
   t.is(alice.room.status, 'connected')
   t.alike(names(alice.room), ['Bob'])
   t.alike(names(bob.room), ['Alice'])
+  t.alike(alice.events, [{ joined: 'Bob' }], 'the peer already in the room is told who joined')
+  t.alike(bob.events, [{}], 'the newcomer just sees who is there')
 
   await bob.room.send('m2', 'hi Alice')
   await until(() => alice.messages.length === 2)

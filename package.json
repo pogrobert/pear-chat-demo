@@ -2,7 +2,7 @@
   "name": "pear-chat-demo",
   "productName": "PearChatDemo",
   "version": "0.1.0",
-  "upgrade": "pear://<YOUR_KEY_HERE>",
+  "upgrade": "pear://e7y49xbjbny59i3cf1o4s3ou9ctoymmmbwyhk88xgo9wzt7qygxo",
   "description": "A small P2P chat built to learn Pear: React UI over Hyperswarm + Hypercore",
   "license": "MIT",
   "author": "",

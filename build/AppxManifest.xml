@@ -6,7 +6,7 @@
   xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
   IgnorableNamespaces="rescap desktop6"
 >
-  <Identity Name="HelloPear" Version="1.0.0.0" Publisher="CN=My Publisher" ProcessorArchitecture="x64" />
+  <Identity Name="PearChatDemo" Version="1.0.0.0" Publisher="CN=My Publisher" ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>Hello Pear</DisplayName>
     <PublisherDisplayName>My Publisher</PublisherDisplayName>
@@ -26,7 +26,7 @@
     <rescap:Capability Name="unvirtualizedResources" />
   </Capabilities>
   <Applications>
-    <Application Id="App" Executable="app\HelloPear.exe" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="App" Executable="app\PearChatDemo.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements DisplayName="Hello Pear" Description="Description of my app" Square150x150Logo="build\icon.png" Square44x44Logo="build\icon.png" BackgroundColor="transparent" />
     </Application>
   </Applications>

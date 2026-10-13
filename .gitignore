@@ -2,3 +2,4 @@ out/
 node_modules/
 renderer/dist/
 .DS_Store
+test/screenshots/
