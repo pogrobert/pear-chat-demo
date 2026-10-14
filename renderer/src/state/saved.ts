@@ -2,6 +2,13 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import type { SavedRoom } from '../types.ts'
 
+// Sidebar width limits; read by the store while it is created, so declared first.
+export const SIDEBAR = { min: 220, max: 420, default: 290, collapseBelow: 150 }
+
+export function clampSidebar(width: number): number {
+  return Math.round(Math.min(SIDEBAR.max, Math.max(SIDEBAR.min, width)))
+}
+
 // What this Mac remembers between launches: your name, your rooms, which room
 // was open, and whether to send read receipts. Peers never see any of it.
 interface SavedState {
@@ -9,7 +16,9 @@ interface SavedState {
   receipts: boolean
   lastRoom: string | null
   rooms: SavedRoom[]
+  sidebarWidth: number
   setName(name: string): void
+  setSidebarWidth(width: number): void
   setReceipts(on: boolean): void
   setLastRoom(key: string | null): void
   noteRoom(key: string, update: { people: string[]; last?: SavedRoom['last'] }): void
@@ -20,7 +29,9 @@ export const useSaved = create<SavedState>()(
   persist(
     (set) => ({
       ...fromEarlierVersions(),
+      sidebarWidth: SIDEBAR.default,
       setName: (name) => set({ name }),
+      setSidebarWidth: (width) => set({ sidebarWidth: clampSidebar(width) }),
       setReceipts: (receipts) => set({ receipts }),
       setLastRoom: (lastRoom) => set({ lastRoom }),
 
@@ -47,7 +58,13 @@ export const useSaved = create<SavedState>()(
     {
       name: 'pear-chat',
       storage: createJSONStorage(() => localStorage),
-      partialize: ({ name, receipts, lastRoom, rooms }) => ({ name, receipts, lastRoom, rooms })
+      partialize: ({ name, receipts, lastRoom, rooms, sidebarWidth }) => ({
+        name,
+        receipts,
+        lastRoom,
+        rooms,
+        sidebarWidth
+      })
     }
   )
 )

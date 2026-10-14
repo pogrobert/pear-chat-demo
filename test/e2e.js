@@ -207,7 +207,13 @@ async function launch(name, port) {
     async shot(file) {
       const id = windowId(child.pid)
       const out = path.join(shots, file + '-' + name + '.png')
-      if (id) execFileSync('screencapture', ['-x', '-o', '-l', id, out])
+      // Screenshots are a by-product; macOS refuses them while the display
+      // sleeps or the screen is locked, which should not fail the run.
+      try {
+        if (id) execFileSync('screencapture', ['-x', '-o', '-l', id, out], { stdio: 'ignore' })
+      } catch {
+        console.log(`(no screenshot for ${file}: the window could not be captured)`)
+      }
     }
   }
   apps.push(app)

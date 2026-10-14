@@ -2,6 +2,7 @@ import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import Icon from './icons.tsx'
 import Avatar from './Avatar.tsx'
+import Resizer from './Resizer.tsx'
 import { useChat } from './state/chat.ts'
 import { roomLabel, useSaved } from './state/saved.ts'
 import type { SavedRoom } from './types.ts'
@@ -187,6 +188,8 @@ export default function Sidebar({
           </ul>
         )}
       </div>
+
+      <Resizer onCollapse={onHide} />
 
       <div className='me-bar'>
         <Avatar seed={inRoom ? me : null} size='me' />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useChat } from './state/chat.ts'
 import { roomLabel, useSaved } from './state/saved.ts'
@@ -17,8 +17,13 @@ type Sheet = 'rename' | 'join' | null
 type Pending = 'create' | 'join' | null
 
 export default function App() {
-  const { name, receipts, rooms } = useSaved(
-    useShallow((s) => ({ name: s.name, receipts: s.receipts, rooms: s.rooms }))
+  const { name, receipts, rooms, sidebarWidth } = useSaved(
+    useShallow((s) => ({
+      name: s.name,
+      receipts: s.receipts,
+      rooms: s.rooms,
+      sidebarWidth: s.sidebarWidth
+    }))
   )
   // Only what the window frame needs; the conversation subscribes to the rest
   // itself, so a new message doesn't re-render the whole window.
@@ -153,7 +158,11 @@ export default function App() {
 
   return (
     <>
-      <div className={'app' + (showSidebar ? '' : ' sidebar-hidden')} inert={onboarding}>
+      <div
+        className={'app' + (showSidebar ? '' : ' sidebar-hidden')}
+        style={{ '--sidebar-width': sidebarWidth + 'px' } as CSSProperties}
+        inert={onboarding}
+      >
         {showSidebar && (
           <Sidebar
             online={online}

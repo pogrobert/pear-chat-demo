@@ -217,7 +217,7 @@ input:focus-visible {
 
 .app {
   display: grid;
-  grid-template-columns: 290px 1fr;
+  grid-template-columns: var(--sidebar-width, 290px) 1fr;
   height: 100%;
 }
 
@@ -229,6 +229,7 @@ input:focus-visible {
 
 .sidebar {
   --ring: var(--sidebar-solid);
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1194,4 +1195,50 @@ button.destructive {
   .typing {
     transform: none !important;
   }
+}
+
+/* --- sidebar resizing --- */
+
+.resizer {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  -webkit-app-region: no-drag;
+}
+
+/* a hairline appears on hover or focus, so the handle can be found */
+.resizer::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3.5px;
+  width: 1px;
+  background: transparent;
+  transition: background-color 150ms ease;
+  content: '';
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .resizer:hover::after {
+    background: var(--separator);
+  }
+}
+
+.resizer:focus-visible {
+  outline: none;
+}
+
+.resizer:focus-visible::after,
+.resizing .resizer::after {
+  background: var(--accent);
+}
+
+.resizing,
+.resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }

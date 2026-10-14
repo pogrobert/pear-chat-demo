@@ -51,7 +51,7 @@ Things to try:
 npm test
 ```
 
-Runs the room logic with real Hyperswarm and Corestore peers against a local DHT (`hyperdht/testnet`), so it does not touch the public network. It covers chat, presence, pending to synced, offline catch-up, and messages reaching a peer who never met their author.
+Runs the room logic with real Hyperswarm and Corestore peers against a local DHT (`hyperdht/testnet`), so it does not touch the public network. It covers chat, presence, pending to synced, offline catch-up, messages reaching a peer who never met their author, typing, and read receipts. It also runs the renderer's state logic (merging, delivery, receipts) as plain unit tests.
 
 ```sh
 npm run build:ui && node test/e2e.js
@@ -86,14 +86,25 @@ view only                                 spawns + relays              Hyperswar
 
 This is the layout of the official [hello-pear-electron](https://github.com/holepunchto/hello-pear-electron) template. All P2P code runs in a [Bare](https://github.com/holepunchto/bare) worker started through `pear-runtime`. The renderer is a sandboxed web page that only exchanges small JSON messages with it.
 
-| File                      | What it does                                                   |
-| ------------------------- | -------------------------------------------------------------- |
-| `workers/room.js`         | The P2P logic for one room. Start here.                        |
-| `workers/main.js`         | Worker entry: one Corestore, one Hyperswarm, the IPC protocol  |
-| `renderer/src/useChat.js` | Turns worker events into UI state, merges and orders messages  |
-| `renderer/src/*.jsx`      | The screens and states                                         |
-| `electron/native.js`      | The Mac-native shell: menu bar, dialogs, context menus, accent |
-| `electron/`               | The template's shell, lightly adapted                          |
+| File                                | What it does                                                                 |
+| ----------------------------------- | ---------------------------------------------------------------------------- |
+| `workers/room.js`                   | The P2P logic for one room. Start here.                                      |
+| `workers/main.js`                   | Worker entry: one Corestore, one Hyperswarm, the IPC protocol                |
+| `renderer/src/state/chat-state.mts` | How chat state changes for each worker event; pure, unit tested              |
+| `renderer/src/state/chat.ts`        | Zustand store for the live session: worker events in, actions out            |
+| `renderer/src/state/saved.ts`       | Zustand store for what this Mac remembers (name, rooms, settings), persisted |
+| `renderer/src/Timeline.tsx`         | The virtualized message list                                                 |
+| `renderer/src/*.tsx`                | The rest of the UI, in TypeScript                                            |
+| `electron/native.js`                | The Mac-native shell: menu bar, dialogs, context menus, accent               |
+| `electron/`                         | The template's shell, lightly adapted                                        |
+
+### The renderer
+
+- **TypeScript, strict.** The worker's events, the stores and every component's props are typed, and `npm run lint` type-checks. The types caught one real bug while converting: the new store had a `typing` field (who is typing) and a `typing()` action (I am typing) with the same name.
+- **Zustand for state.** One store holds the live session the worker reports; the other holds what the Mac remembers and persists itself. Components subscribe only to the slices they use, so a new message re-renders the conversation, not the window.
+- **Pure state logic.** How each worker event changes the state lives in `chat-state.mts` with no React or Electron in it. Node runs its unit tests straight from TypeScript.
+- **A virtualized message list.** Only the rows on screen are in the DOM (TanStack Virtual), each measured because bubbles differ in height, and the list stays pinned to the newest message. With 2,000 messages in a room, 22 rows exist in the page.
+- **Avatars from keys.** Each person's avatar is a Boring Avatars marble drawn from their key in the room, so two people called Alice still look different; rooms get one from the room key.
 
 ### Looking native on macOS
 
