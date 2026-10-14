@@ -1,31 +1,31 @@
+import { useState } from 'react'
 import Icon from './icons.jsx'
 import { roomLabel } from './useRooms.js'
 
 const bridge = window.bridge
 const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
+const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'long' })
 const date = new Intl.DateTimeFormat(undefined, {
-  month: 'numeric',
-  day: 'numeric',
+  day: '2-digit',
+  month: '2-digit',
   year: '2-digit'
 })
 
-export default function Sidebar({
-  rooms,
-  current,
-  peers,
-  name,
-  onSelect,
-  onAdd,
-  onCopy,
-  onRemove,
-  onHide
-}) {
+export default function Sidebar({ rooms, current, onSelect, onCopy, onRemove, onHide }) {
+  const [query, setQuery] = useState('')
+  const q = query.trim().toLowerCase()
+  const shown = q
+    ? rooms.filter((room) =>
+        (roomLabel(room) + ' ' + (room.last?.text || '')).toLowerCase().includes(q)
+      )
+    : rooms
+
   // Arrow keys move through the list, as in any Mac source list.
   function onKeyDown(event) {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
     event.preventDefault()
-    const index = rooms.findIndex((room) => room.key === current)
-    const next = rooms[index + (event.key === 'ArrowDown' ? 1 : -1)]
+    const index = shown.findIndex((room) => room.key === current)
+    const next = shown[index + (event.key === 'ArrowDown' ? 1 : -1)]
     if (next) {
       onSelect(next.key)
       document.getElementById('room-' + next.key)?.focus()
@@ -46,29 +46,37 @@ export default function Sidebar({
   return (
     <nav className='sidebar' aria-label='Rooms'>
       <div className='sidebar-top drag'>
-        <button className='tool' onClick={onHide} aria-label='Hide sidebar' title='Hide Sidebar'>
+        <button
+          className='glass-button'
+          onClick={onHide}
+          aria-label='Hide sidebar'
+          title='Hide Sidebar'
+        >
           <Icon name='sidebar' />
         </button>
       </div>
 
-      <div className='sidebar-scroll'>
-        <div className='section-header'>
-          <h2>Rooms</h2>
-          <button
-            className='tool small'
-            onClick={onAdd}
-            aria-label='New or join room'
-            title='New Room or Join Room'
-          >
-            <Icon name='plus' />
-          </button>
-        </div>
+      <label className='search'>
+        <Icon name='search' size={14} />
+        <input
+          type='search'
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => event.key === 'Escape' && setQuery('')}
+          placeholder='Search'
+          aria-label='Search rooms'
+          spellCheck={false}
+        />
+      </label>
 
+      <div className='sidebar-scroll'>
         {rooms.length === 0 ? (
-          <p className='sidebar-empty'>No rooms yet</p>
+          <p className='sidebar-empty'>No Rooms</p>
+        ) : shown.length === 0 ? (
+          <p className='sidebar-empty'>No Results</p>
         ) : (
           <ul className='rooms' onKeyDown={onKeyDown}>
-            {rooms.map((room) => (
+            {shown.map((room) => (
               <li key={room.key}>
                 <button
                   id={'room-' + room.key}
@@ -92,49 +100,53 @@ export default function Sidebar({
             ))}
           </ul>
         )}
-
-        {current && (
-          <>
-            <div className='section-header'>
-              <h2>Here Now</h2>
-            </div>
-            <ul className='people'>
-              <li>
-                <Avatar names={[name]} small />
-                <span className='grow'>{name}</span>
-                <span className='you'>You</span>
-              </li>
-              {peers.map((peer) => (
-                <li key={peer.id}>
-                  <Avatar names={[peer.name]} small online />
-                  <span className='grow'>{peer.name}</span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
       </div>
     </nav>
   )
 }
 
-export function Avatar({ names, small, online }) {
-  const initials = names.length
-    ? names
-        .slice(0, 2)
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-    : null
+// A stable color per person, so the same name always looks the same.
+const hues = [
+  ['#ff9f6b', '#f26b3a'],
+  ['#6fc3ff', '#2f8de4'],
+  ['#8ee28a', '#3dae50'],
+  ['#c39bff', '#8a5be0'],
+  ['#ffcf5c', '#e7a21f'],
+  ['#ff8fb4', '#e0507e'],
+  ['#6fe0d4', '#21a89a']
+]
+
+function colorFor(name) {
+  let hash = 0
+  for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  const [top, bottom] = hues[hash % hues.length]
+  return `linear-gradient(${top}, ${bottom})`
+}
+
+export function Avatar({ names, size = 'large', online }) {
+  const initials = names
+    .slice(0, 2)
+    .map((name) => name[0])
+    .join('')
+    .toUpperCase()
   return (
-    <span className={'avatar' + (small ? ' small' : '')} aria-hidden='true'>
-      {initials || <Icon name='bubbles' size={small ? 12 : 18} />}
+    <span
+      className={'avatar ' + size}
+      style={names.length === 1 ? { background: colorFor(names[0]) } : undefined}
+      aria-hidden='true'
+    >
+      {initials || <Icon name='bubbles' size={size === 'large' ? 20 : 12} />}
       {online && <span className='online' />}
     </span>
   )
 }
 
+// Like Messages: a time today, then "Yesterday", a weekday, or a date.
 function when(at) {
-  const today = new Date().toDateString() === new Date(at).toDateString()
-  return today ? time.format(at) : date.format(at)
+  const day = (offset) => new Date(Date.now() - offset * 864e5).toDateString()
+  const then = new Date(at).toDateString()
+  if (then === day(0)) return time.format(at)
+  if (then === day(1)) return 'Yesterday'
+  if (Date.now() - at < 6 * 864e5) return weekday.format(at)
+  return date.format(at)
 }

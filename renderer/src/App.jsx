@@ -7,6 +7,7 @@ import Sidebar from './Sidebar.jsx'
 import Conversation, { Empty } from './Conversation.jsx'
 import { NameSheet, JoinSheet } from './Sheets.jsx'
 import Icon from './icons.jsx'
+import RoomHeader from './RoomHeader.jsx'
 
 const bridge = window.bridge
 
@@ -113,10 +114,7 @@ export default function App() {
         <Sidebar
           rooms={rooms}
           current={state.key}
-          peers={inRoom ? state.peers : []}
-          name={name}
           onSelect={(key) => key !== state.key && chat.join(key)}
-          onAdd={addRoom}
           onCopy={copyKey}
           onRemove={removeRoom}
           onHide={() => setSidebarOpen(false)}
@@ -125,32 +123,41 @@ export default function App() {
 
       <main className='content'>
         <header className='toolbar drag'>
-          {!showSidebar && !narrow && (
+          <div className='toolbar-side'>
+            {!showSidebar && !narrow && (
+              <button
+                className='glass-button'
+                onClick={() => setSidebarOpen(true)}
+                aria-label='Show sidebar'
+                title='Show Sidebar'
+              >
+                <Icon name='sidebar' />
+              </button>
+            )}
             <button
-              className='tool'
-              onClick={() => setSidebarOpen(true)}
-              aria-label='Show sidebar'
-              title='Show Sidebar'
+              className='glass-button'
+              onClick={addRoom}
+              aria-label='New room'
+              title='New Room or Join Room'
             >
-              <Icon name='sidebar' />
+              <Icon name='compose' />
             </button>
-          )}
-          <div className='title'>
-            <h1>{inRoom ? roomLabel(current) : 'Pear Chat'}</h1>
-            {inRoom && <Status status={state.status} peers={state.peers} online={online} />}
           </div>
           {inRoom && (
-            <div className='tool-group'>
-              <button
-                className='tool'
-                onClick={() => copyKey()}
-                aria-label='Copy room key'
-                title='Copy Room Key'
-              >
-                <Icon name={copied ? 'check' : 'copy'} />
-              </button>
-            </div>
+            <RoomHeader
+              label={roomLabel(current)}
+              people={current?.people || []}
+              peers={state.peers}
+              name={name}
+              roomKey={state.key}
+              copied={copied}
+              onCopy={() => copyKey()}
+              onRemove={() => current && removeRoom(current)}
+            />
           )}
+          <div className='toolbar-side end'>
+            {inRoom && <Status status={state.status} peers={state.peers} online={online} />}
+          </div>
           <span className='sr-only' role='status'>
             {copied ? 'Room key copied' : ''}
           </span>
@@ -171,6 +178,7 @@ export default function App() {
         ) : inRoom ? (
           <Conversation
             state={state}
+            people={current?.people}
             online={online}
             onSend={chat.send}
             onCopyKey={() => copyKey()}
@@ -222,7 +230,7 @@ function Status({ status, peers, online }) {
         ? { tone: 'idle', label: 'No one else is here' }
         : { tone: 'busy', label: 'Looking for peers…' }
   return (
-    <p className={'subtitle ' + tone} role='status'>
+    <p className={'status-pill ' + tone} role='status'>
       <span className='dot' aria-hidden='true' />
       {label}
     </p>

@@ -22,6 +22,15 @@
   --green: #34c759;
   --orange: #ff9500;
   --red: #ff3b30;
+  /* floating glass controls (CSS stand-in for Liquid Glass on small controls) */
+  --glass: rgb(255 255 255 / 0.72);
+  --glass-edge: rgb(255 255 255 / 0.9);
+  --glass-ring: rgb(0 0 0 / 0.08);
+  --popover: rgb(250 250 250 / 0.86);
+  /* motion: curves from Emil Kowalski's animation guidance */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   font:
     13px/1.25 -apple-system,
     BlinkMacSystemFont,
@@ -54,6 +63,10 @@
     --green: #30d158;
     --orange: #ff9f0a;
     --red: #ff453a;
+    --glass: rgb(48 48 50 / 0.66);
+    --glass-edge: rgb(255 255 255 / 0.12);
+    --glass-ring: rgb(0 0 0 / 0.45);
+    --popover: rgb(40 40 42 / 0.88);
   }
 }
 
@@ -214,11 +227,58 @@ input:focus-visible {
   font-size: 11px;
 }
 
+/* --- floating glass controls --- */
+
+.glass-button,
+.glass-pill,
+.status-pill,
+.catchup {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow:
+    inset 0 0.5px 0 var(--glass-edge),
+    0 0 0 0.5px var(--glass-ring),
+    0 2px 10px rgb(0 0 0 / 0.12);
+}
+
+.glass-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--label);
+  transition: transform 160ms var(--ease-out);
+}
+
+/* press feedback, the instant the pointer goes down */
+.glass-button:active,
+.glass-pill:active,
+.send:active {
+  transform: scale(0.96);
+  filter: none;
+}
+
+/* on the glass sidebar, a lighter control (no glass on glass) */
+.sidebar .glass-button {
+  background: var(--fill);
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sidebar .glass-button:hover {
+    background: var(--fill-strong);
+  }
+}
+
 /* --- window layout --- */
 
 .app {
   display: grid;
-  grid-template-columns: 250px 1fr;
+  grid-template-columns: 290px 1fr;
   height: 100%;
 }
 
@@ -226,7 +286,7 @@ input:focus-visible {
   grid-template-columns: 1fr;
 }
 
-/* --- sidebar: the glass layer --- */
+/* --- sidebar: the Liquid Glass layer --- */
 
 .sidebar {
   display: flex;
@@ -250,42 +310,76 @@ html[data-material='none'] .sidebar {
   flex: none;
   align-items: center;
   justify-content: flex-end;
-  height: 52px;
+  height: 56px;
+  padding: 0 12px;
+}
+
+.search {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  margin: 2px 12px 10px;
   padding: 0 10px;
+  border-radius: 999px;
+  background: var(--fill);
+  color: var(--secondary);
+}
+
+.search:focus-within {
+  outline: 3.5px solid var(--focus);
+}
+
+.search input {
+  flex: 1;
+  height: auto;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .sidebar-scroll {
   flex: 1;
   min-height: 0;
-  padding: 0 10px 12px;
+  padding: 0 8px 12px;
   overflow-y: auto;
 }
 
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 8px 4px;
-}
-
-.section-header h2 {
-  color: var(--secondary);
-  font-size: 11px;
-  font-weight: 600;
-}
-
 .sidebar-empty {
-  padding: 4px 8px;
+  padding: 12px;
   color: var(--secondary);
+  text-align: center;
+}
+
+.rooms li {
+  position: relative;
+}
+
+/* inset hairlines between rows, hidden around the selection */
+.rooms li + li::before {
+  position: absolute;
+  top: 0;
+  right: 12px;
+  left: 66px;
+  border-top: 0.5px solid var(--separator);
+  content: '';
+}
+
+.rooms li:has(> [aria-current])::before,
+.rooms li:has(> [aria-current]) + li::before {
+  display: none;
 }
 
 .room-row {
   display: flex;
+  align-items: center;
   gap: 10px;
   width: 100%;
   height: auto;
-  padding: 8px;
-  border-radius: 10px;
+  padding: 10px;
+  border-radius: 12px;
   background: transparent;
   box-shadow: none;
   text-align: left;
@@ -335,7 +429,6 @@ html[data-material='none'] .sidebar {
 
 .room-time {
   flex: none;
-  font-size: 11px;
 }
 
 .room-preview {
@@ -361,13 +454,16 @@ html[data-material='none'] .sidebar {
   display: grid;
   flex: none;
   place-items: center;
-  width: 36px;
-  height: 36px;
   border-radius: 50%;
   background: linear-gradient(#a9aeb9, #858a95);
   color: #fff;
-  font-size: 13px;
   font-weight: 600;
+}
+
+.avatar.large {
+  width: 44px;
+  height: 44px;
+  font-size: 16px;
 }
 
 .avatar.small {
@@ -382,17 +478,177 @@ html[data-material='none'] .sidebar {
   bottom: -2px;
   width: 9px;
   height: 9px;
-  border: 1.5px solid #fff;
+  border: 1.5px solid var(--content);
   border-radius: 50%;
   background: var(--green);
+}
+
+/* --- content: the opaque layer --- */
+
+.content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--content);
+  box-shadow: -0.5px 0 0 var(--separator);
+}
+
+/* The toolbar floats over the conversation, which scrolls underneath it. */
+.toolbar {
+  position: absolute;
+  z-index: 3;
+  inset: 0 0 auto;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  height: 60px;
+  padding: 0 14px;
+}
+
+/* scroll edge effect: blur and fade where content meets the floating controls */
+.toolbar::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 -14px;
+  background: linear-gradient(var(--content) 30%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  -webkit-mask-image: linear-gradient(black 55%, transparent);
+  mask-image: linear-gradient(black 55%, transparent);
+  pointer-events: none;
+  content: '';
+}
+
+html[data-platform='darwin'] .sidebar-hidden .toolbar {
+  padding-left: 84px;
+}
+
+.toolbar-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-side.end {
+  justify-content: flex-end;
+}
+
+.room-header {
+  position: relative;
+  min-width: 0;
+}
+
+.glass-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 320px;
+  height: 34px;
+  padding: 0 12px 0 6px;
+  color: var(--label);
+  transition: transform 160ms var(--ease-out);
+}
+
+.glass-pill .icon {
+  color: var(--secondary);
+}
+
+.glass-pill-label {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  color: var(--secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tertiary);
+  transition: background-color 200ms ease;
+}
+
+.status-pill.on .dot {
+  background: var(--green);
+}
+
+.status-pill.busy .dot {
+  background: var(--orange);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.status-pill.off {
+  color: var(--orange);
+}
+
+/* Room details: grows out of the pill that opened it. */
+.popover {
+  position: absolute;
+  z-index: 4;
+  top: calc(100% + 8px);
+  left: 50%;
+  width: 300px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--popover);
+  -webkit-backdrop-filter: blur(30px) saturate(1.8);
+  backdrop-filter: blur(30px) saturate(1.8);
+  box-shadow:
+    0 0 0 0.5px var(--glass-ring),
+    0 12px 40px rgb(0 0 0 / 0.28);
+  transform: translateX(-50%);
+  transform-origin: top center;
+  transition:
+    opacity 160ms var(--ease-out),
+    transform 160ms var(--ease-out);
+  -webkit-app-region: no-drag;
+}
+
+@starting-style {
+  .popover {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.96);
+  }
+}
+
+.popover[data-state='closing'] {
+  opacity: 0;
+  transform: translateX(-50%) scale(0.96);
+}
+
+.popover h2 {
+  margin: 4px 0 6px;
+  color: var(--secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.popover h2 + * {
+  margin-bottom: 8px;
 }
 
 .people li {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 30px;
-  padding: 0 8px;
+  min-height: 28px;
 }
 
 .grow {
@@ -408,102 +664,60 @@ html[data-material='none'] .sidebar {
   font-size: 11px;
 }
 
-/* --- content: the opaque layer --- */
-
-.content {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  background: var(--content);
-  box-shadow: -0.5px 0 0 var(--separator);
+.key {
+  margin-bottom: 4px;
+  word-break: break-all;
+  user-select: all;
 }
 
-.toolbar {
+.popover-buttons {
   display: flex;
-  flex: none;
-  align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  height: 52px;
-  padding: 0 12px 0 18px;
-  border-bottom: 0.5px solid var(--separator);
+  margin-top: 12px;
 }
 
-/* traffic lights sit over the content when the sidebar is hidden */
-html[data-platform='darwin'] .sidebar-hidden .toolbar {
-  padding-left: 84px;
-}
-
-.title {
-  flex: 1;
-  min-width: 0;
-}
-
-.title h1 {
-  overflow: hidden;
-  font-size: 15px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.subtitle {
+.popover-buttons button {
   display: flex;
   align-items: center;
   gap: 5px;
-  color: var(--secondary);
-  font-size: 11px;
 }
 
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--tertiary);
+button.destructive {
+  color: var(--red);
 }
 
-.subtitle.on .dot {
-  background: var(--green);
-}
-
-.subtitle.busy .dot {
-  background: var(--orange);
-  animation: pulse 1.2s ease-in-out infinite;
-}
-
-.subtitle.off {
-  color: var(--orange);
-}
-
-.tool-group {
-  display: flex;
-  padding: 2px;
-  border-radius: 999px;
-  background: var(--fill);
-}
+/* --- catch-up capsule: drops from the toolbar, leaves the same way --- */
 
 .catchup {
+  position: absolute;
+  z-index: 2;
+  top: 66px;
+  left: 50%;
   display: flex;
-  flex: none;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 6px 16px;
-  border-bottom: 0.5px solid var(--separator);
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
   color: var(--secondary);
-  font-size: 11px;
+  font-size: 12px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  transition:
+    opacity 400ms ease,
+    transform 400ms ease;
 }
 
-.catchup span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+@starting-style {
+  .catchup {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
 }
 
-.catchup progress {
-  width: 100px;
-  accent-color: var(--accent);
+.catchup[data-state='closing'] {
+  opacity: 0;
+  transform: translate(-50%, -12px);
 }
 
 /* --- messages --- */
@@ -516,7 +730,7 @@ html[data-platform='darwin'] .sidebar-hidden .toolbar {
 
 .timeline {
   height: 100%;
-  padding: 6px 18px 12px;
+  padding: 66px 22px 12px 18px;
   overflow-y: auto;
 }
 
@@ -545,47 +759,58 @@ html[data-platform='darwin'] .sidebar-hidden .toolbar {
   flex-direction: column;
   align-items: flex-start;
   margin-top: 2px;
+  transform-origin: bottom left;
 }
 
 .message.first {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .message.mine {
   align-items: flex-end;
+  transform-origin: bottom right;
+}
+
+/* New messages rise in from their side. History never animates (see
+   Timeline), so this only plays for messages that arrive live. */
+.message.enter,
+.notice.enter,
+.delivery {
+  transition:
+    opacity 220ms var(--ease-out),
+    transform 220ms var(--ease-out);
+}
+
+@starting-style {
+  .message.enter {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  .notice.enter,
+  .delivery {
+    opacity: 0;
+  }
 }
 
 .author {
-  margin: 0 0 2px 12px;
+  margin: 0 0 2px 13px;
   color: var(--secondary);
   font-size: 11px;
 }
 
 .bubble {
+  position: relative;
   max-width: min(70%, 480px);
-  padding: 6px 12px 7px;
-  border-radius: 17px;
+  padding: 7px 13px 8px;
+  border-radius: 18px;
   background: var(--bubble);
-  font-size: 13px;
-  line-height: 17px;
+  font-size: 14px;
+  line-height: 18px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   user-select: text;
   cursor: text;
-}
-
-/* consecutive bubbles from one person tuck together */
-.message:not(.mine):not(.first) .bubble {
-  border-top-left-radius: 5px;
-}
-.message:not(.mine):not(.last) .bubble {
-  border-bottom-left-radius: 5px;
-}
-.message.mine:not(.first) .bubble {
-  border-top-right-radius: 5px;
-}
-.message.mine:not(.last) .bubble {
-  border-bottom-right-radius: 5px;
+  transition: background-color 300ms ease;
 }
 
 .mine .bubble {
@@ -593,15 +818,67 @@ html[data-platform='darwin'] .sidebar-hidden .toolbar {
   color: #fff;
 }
 
+/* not yet with any peer: a paler bubble, firming up once delivered */
 .message.pending .bubble {
-  opacity: 0.6;
+  background: color-mix(in srgb, var(--accent) 55%, var(--content));
+}
+
+/* consecutive bubbles from one person tuck together */
+.message:not(.mine):not(.first) .bubble {
+  border-top-left-radius: 6px;
+}
+.message:not(.mine):not(.last) .bubble {
+  border-bottom-left-radius: 6px;
+}
+.message.mine:not(.first) .bubble {
+  border-top-right-radius: 6px;
+}
+.message.mine:not(.last) .bubble {
+  border-bottom-right-radius: 6px;
+}
+
+/* the tail on the last bubble of a run */
+.message.last .bubble::before,
+.message.last .bubble::after {
+  position: absolute;
+  bottom: 0;
+  height: 17px;
+  content: '';
+}
+
+.message.mine.last .bubble::before {
+  right: -7px;
+  width: 20px;
+  border-bottom-left-radius: 16px 14px;
+  background: inherit;
+}
+
+.message.mine.last .bubble::after {
+  right: -26px;
+  width: 26px;
+  border-bottom-left-radius: 10px;
+  background: var(--content);
+}
+
+.message:not(.mine).last .bubble::before {
+  left: -7px;
+  width: 20px;
+  border-bottom-right-radius: 16px 14px;
+  background: inherit;
+}
+
+.message:not(.mine).last .bubble::after {
+  left: -26px;
+  width: 26px;
+  border-bottom-right-radius: 10px;
+  background: var(--content);
 }
 
 .delivery {
   display: flex;
   align-items: center;
   gap: 3px;
-  margin: 3px 6px 0;
+  margin: 3px 4px 0;
   color: var(--secondary);
   font-size: 11px;
 }
@@ -616,6 +893,16 @@ html[data-platform='darwin'] .sidebar-hidden .toolbar {
   left: 50%;
   transform: translateX(-50%);
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+
+@starting-style {
+  .jump {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
 }
 
 .waiting {
@@ -625,17 +912,24 @@ html[data-platform='darwin'] .sidebar-hidden .toolbar {
   text-align: center;
 }
 
+/* --- composer --- */
+
 .composer {
+  display: flex;
   flex: none;
-  padding: 8px 16px 14px;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 14px 14px;
 }
 
 .composer-field {
   display: flex;
+  flex: 1;
   align-items: flex-end;
   gap: 6px;
-  padding: 3px 3px 3px 12px;
-  border-radius: 16px;
+  min-height: 34px;
+  padding: 4px 4px 4px 14px;
+  border-radius: 17px;
   background: var(--field);
   box-shadow: inset 0 0 0 0.5px var(--field-edge);
 }
@@ -647,13 +941,14 @@ html[data-platform='darwin'] .sidebar-hidden .toolbar {
 .composer textarea {
   flex: 1;
   max-height: 120px;
-  padding: 4px 0;
+  padding: 3px 0;
   border: 0;
   outline: none;
   background: transparent;
   color: var(--label);
   font: inherit;
-  line-height: 18px;
+  font-size: 14px;
+  line-height: 20px;
   resize: none;
   user-select: text;
   cursor: text;
@@ -661,6 +956,7 @@ html[data-platform='darwin'] .sidebar-hidden .toolbar {
 
 .send {
   display: grid;
+  flex: none;
   place-items: center;
   width: 26px;
   height: 26px;
@@ -668,12 +964,15 @@ html[data-platform='darwin'] .sidebar-hidden .toolbar {
   background: var(--accent);
   box-shadow: none;
   color: #fff;
+  transition:
+    opacity 150ms var(--ease-out),
+    transform 150ms var(--ease-out);
 }
 
-.send:disabled {
-  background: var(--fill-strong);
-  color: var(--secondary);
-  opacity: 1;
+/* hidden until there is something to send */
+.send[data-ready='false'] {
+  opacity: 0;
+  transform: scale(0.9);
 }
 
 .send .icon {
@@ -732,11 +1031,18 @@ html[data-platform='darwin'] .sidebar-hidden .toolbar {
   animation: spin 0.9s linear infinite;
 }
 
+.spinner.small {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  border-width: 1.5px;
+}
+
 /* --- sheets --- */
 
 .sheet {
   width: min(420px, calc(100% - 40px));
-  margin: 60px auto auto;
+  margin: 64px auto auto;
   padding: 20px;
   border: 0;
   border-radius: 18px;
@@ -746,11 +1052,27 @@ html[data-platform='darwin'] .sidebar-hidden .toolbar {
     0 24px 70px rgb(0 0 0 / 0.35);
   color: var(--label);
   line-height: 1.4;
-  animation: sheet-in 0.2s ease-out;
+  transition:
+    opacity 250ms var(--ease-out),
+    transform 250ms var(--ease-out);
+}
+
+@starting-style {
+  .sheet[open] {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
 }
 
 .sheet::backdrop {
   background: rgb(0 0 0 / 0.12);
+  transition: opacity 250ms var(--ease-out);
+}
+
+@starting-style {
+  .sheet[open]::backdrop {
+    opacity: 0;
+  }
 }
 
 .sheet h2 {
@@ -780,13 +1102,6 @@ html[data-platform='darwin'] .sidebar-hidden .toolbar {
   min-width: 76px;
 }
 
-@keyframes sheet-in {
-  from {
-    opacity: 0;
-    transform: translateY(-12px);
-  }
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -799,10 +1114,72 @@ html[data-platform='darwin'] .sidebar-hidden .toolbar {
   }
 }
 
+/* Reduced motion: keep the fades that explain what changed, drop movement. */
 @media (prefers-reduced-motion: reduce) {
   .spinner,
-  .subtitle.busy .dot,
-  .sheet {
+  .status-pill.busy .dot {
     animation: none;
   }
+  .message,
+  .popover,
+  .catchup,
+  .sheet,
+  .jump,
+  .send,
+  .glass-button,
+  .glass-pill {
+    transform: none !important;
+  }
+  .popover,
+  .catchup,
+  .jump {
+    translate: -50% 0;
+  }
+}
+
+/* --- avatars in the header pill and beside group messages --- */
+
+.avatar-stack {
+  display: flex;
+}
+
+.avatar-stack .avatar + .avatar {
+  margin-left: -7px;
+}
+
+.avatar-stack .avatar {
+  box-shadow: 0 0 0 1.5px var(--glass);
+}
+
+.glass-pill-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.glass-pill-meta {
+  color: var(--secondary);
+  font-size: 10.5px;
+}
+
+.bubble-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
+.message.mine .bubble-row {
+  justify-content: flex-end;
+}
+
+.bubble-avatar {
+  flex: none;
+  width: 22px;
+}
+
+.author.indented {
+  margin-left: 43px;
 }

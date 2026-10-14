@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('bridge', {
   ui: ipcRenderer.sendSync('ui:info'),
   confirm: (options) => ipcRenderer.invoke('ui:confirm', options),
   popup: (items) => ipcRenderer.invoke('ui:popup', items),
+  emoji: () => ipcRenderer.send('ui:emoji'),
   setMenuState: (state) => ipcRenderer.send('ui:menu-state', state),
   onMenu: (listener) => subscribe('ui:menu', listener),
   onAccent: (listener) => subscribe('ui:accent', listener),

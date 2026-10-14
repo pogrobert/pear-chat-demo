@@ -1,6 +1,12 @@
 // A few line icons drawn to sit next to SF Pro text (16pt grid, 1.5 stroke).
 const paths = {
   plus: 'M8 3v10M3 8h10',
+  search: 'M7 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM10.6 10.6 14 14',
+  compose: 'M13.5 8.5v4a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h4M11.8 2.2l2 2L8 10H6V8Z',
+  chevron: 'm6 4 4 4-4 4',
+  smile:
+    'M14 8A6 6 0 1 1 2 8a6 6 0 0 1 12 0ZM5.5 9.5s1 1.5 2.5 1.5 2.5-1.5 2.5-1.5M6 6.2v.3M10 6.2v.3',
+  trash: 'M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5',
   sidebar: 'M2.5 3.5h11v9h-11zM6 3.5v9',
   copy: 'M5.5 5.5V3.5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M3.5 5.5h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1Z',
   check: 'm3.5 8.5 3 3 6-7',

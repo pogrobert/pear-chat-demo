@@ -38,7 +38,8 @@ function attach(win) {
     // The glass view sits behind the web contents. Re-adding it replaces the
     // previous one, so this is safe on every reload.
     win.webContents.on('did-finish-load', () => {
-      liquidGlass.addView(win.getNativeWindowHandle(), {})
+      // A light tint lifts the glass to the grey of Apple's own sidebars.
+      liquidGlass.addView(win.getNativeWindowHandle(), { tintColor: '#ffffff12' })
     })
   }
 
@@ -149,6 +150,9 @@ function setup({ version }) {
     menuState = { ...menuState, ...state }
     buildMenu()
   })
+
+  // The system Emoji & Symbols picker, as in Messages.
+  ipcMain.on('ui:emoji', () => app.showEmojiPanel())
 
   // A native alert sheet attached to the window.
   ipcMain.handle('ui:confirm', async (evt, { message, detail, confirm }) => {

@@ -3,8 +3,9 @@ import { statusOf } from './useChat.js'
 import Timeline from './Timeline.jsx'
 import Composer from './Composer.jsx'
 import Icon from './icons.jsx'
+import { usePresence } from './usePresence.js'
 
-export default function Conversation({ state, online, onSend, onCopyKey }) {
+export default function Conversation({ state, people = [], online, onSend, onCopyKey }) {
   const { status, peers, items, syncedLength, catchup, created, key } = state
   const waiting = items.filter((item) => statusOf(item, syncedLength) === 'pending').length
 
@@ -12,6 +13,8 @@ export default function Conversation({ state, online, onSend, onCopyKey }) {
     <>
       <Catchup catchup={catchup} />
       <Timeline
+        roomKey={key}
+        group={people.length > 1}
         items={items}
         syncedLength={syncedLength}
         empty={
@@ -35,35 +38,35 @@ export default function Conversation({ state, online, onSend, onCopyKey }) {
   )
 }
 
-// Shown while missed messages download, then briefly once they are in.
+// A capsule under the toolbar while missed messages download, then briefly
+// once they are in. It drops from the toolbar and leaves the same way.
 function Catchup({ catchup }) {
   const [visible, setVisible] = useState(false)
+  const [mounted, phase] = usePresence(visible, 250)
 
   useEffect(() => {
     if (!catchup) return
     setVisible(true)
     if (catchup.remaining > 0) return
-    const timer = setTimeout(() => setVisible(false), 4000)
+    const timer = setTimeout(() => setVisible(false), 3500)
     return () => clearTimeout(timer)
   }, [catchup])
 
-  if (!catchup || !visible) return null
+  if (!mounted || !catchup) return null
   const { remaining, total } = catchup
   const noun = total === 1 ? 'message' : 'messages'
 
   return (
-    <div className='catchup' role='status'>
+    <div className='catchup' data-state={phase} role='status'>
       {remaining > 0 ? (
         <>
-          <span>
-            Catching up… {total - remaining} of {total} {noun}
-          </span>
-          <progress value={total - remaining} max={total} aria-label='Catching up' />
+          <span className='spinner small' aria-hidden='true' />
+          Catching up… {total - remaining} of {total} {noun}
         </>
       ) : (
-        <span>
+        <>
           <Icon name='check' size={12} /> Up to date. {total} {noun} synced from peers.
-        </span>
+        </>
       )}
     </div>
   )
