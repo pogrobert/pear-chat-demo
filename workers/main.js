@@ -73,14 +73,14 @@ function flush() {
 }
 
 async function join(message) {
-  await closeRoom()
-
   let key
   try {
     key = message.key ? idEnc.decode(message.key.trim()) : crypto.randomBytes(32)
   } catch {
     return emit('join-failed', { reason: 'invalid-key' })
   }
+
+  await closeRoom()
 
   const next = new Room(store, swarm, key, { name: message.name })
   next.on('message', (m) => {

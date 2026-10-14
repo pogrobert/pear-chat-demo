@@ -1,17 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
 import { statusOf } from './useChat.js'
+import Icon from './icons.jsx'
 
 const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
-const day = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'long' })
+const date = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric'
+})
+const full = new Intl.DateTimeFormat(undefined, { dateStyle: 'full', timeStyle: 'short' })
 
-const statusLabels = {
-  pending: 'Saved here, not yet synced',
-  synced: 'Synced',
-  failed: 'Couldn’t save this message'
+const GAP = 15 * 60 * 1000 // a new time heading after 15 quiet minutes, like Messages
+
+const delivery = {
+  pending: {
+    icon: 'clock',
+    label: 'Waiting for a peer',
+    title: 'Saved on this Mac. No peer has it yet.'
+  },
+  synced: { icon: 'check', label: 'Delivered', title: 'At least one peer has this message.' },
+  failed: { icon: 'alert', label: 'Not Delivered', title: 'Could not save this message.' }
 }
 
-export default function Timeline({ state, online }) {
-  const { items, syncedLength } = state
+export default function Timeline({ items, syncedLength, empty }) {
   const list = useRef(null)
   const atBottom = useRef(true)
   const [unseen, setUnseen] = useState(false)
@@ -28,12 +40,8 @@ export default function Timeline({ state, online }) {
     if (atBottom.current) setUnseen(false)
   }
 
-  function jumpToLatest() {
-    list.current.scrollTop = list.current.scrollHeight
-  }
-
-  const hasMessages = items.some((item) => item.kind !== 'notice')
-  const lastMine = items.findLast((item) => item.mine)
+  const messages = items.filter((item) => item.kind !== 'notice')
+  const lastMine = messages.findLast((item) => item.mine)
 
   return (
     <div className='timeline-wrap'>
@@ -45,128 +53,98 @@ export default function Timeline({ state, online }) {
         aria-label='Messages'
         tabIndex={0}
       >
-        {!hasMessages && <EmptyState state={state} online={online} />}
-        {hasMessages &&
-          items.map((item, index) => {
-            const previous = items[index - 1]
-            const newDay = !previous || day.format(previous.at) !== day.format(item.at)
-            return (
-              <div key={item.id}>
-                {newDay && <p className='day'>{day.format(item.at)}</p>}
-                {item.kind === 'notice' ? (
-                  <p className='notice'>{item.text}</p>
-                ) : (
+        {messages.length === 0
+          ? empty
+          : items.map((item, index) => {
+              const previous = items[index - 1]
+              const next = items[index + 1]
+              const heading =
+                !previous || item.at - previous.at > GAP || !sameDay(previous.at, item.at)
+              if (item.kind === 'notice') {
+                return (
+                  <div key={item.id}>
+                    {heading && <TimeHeading at={item.at} />}
+                    <p className='notice'>{item.text}</p>
+                  </div>
+                )
+              }
+              const first = heading || !sameAuthor(previous, item)
+              const last = !sameAuthor(item, next) || (next && next.at - item.at > GAP)
+              return (
+                <div key={item.id}>
+                  {heading && <TimeHeading at={item.at} />}
                   <Message
                     message={item}
+                    first={first}
+                    last={last}
                     status={statusOf(item, syncedLength)}
-                    showLabel={item === lastMine}
-                    grouped={!newDay && isSameAuthor(previous, item)}
+                    showStatus={item === lastMine}
                   />
-                )}
-              </div>
-            )
-          })}
+                </div>
+              )
+            })}
       </div>
       {unseen && (
-        <button className='jump' onClick={jumpToLatest}>
-          New messages ↓
+        <button
+          className='jump'
+          onClick={() => (list.current.scrollTop = list.current.scrollHeight)}
+        >
+          New Messages
         </button>
       )}
     </div>
   )
 }
 
-function isSameAuthor(previous, message) {
-  if (!previous || previous.kind === 'notice') return false
-  return (
-    previous.mine === message.mine &&
-    previous.writer === message.writer &&
-    previous.name === message.name &&
-    message.at - previous.at < 5 * 60 * 1000
-  )
-}
-
-function Message({ message, status, showLabel, grouped }) {
-  // Older synced messages only need the tick. Anything unusual gets words.
-  const labelled = showLabel || status === 'pending' || status === 'failed'
+function Message({ message, first, last, status, showStatus }) {
+  const info = status && delivery[status]
+  // Only my latest message says where it stands (earlier pending ones are
+  // just faded), unless one failed.
+  const labelled = info && (showStatus || status === 'failed')
 
   return (
-    <article className={'message' + (message.mine ? ' mine' : '') + (grouped ? ' grouped' : '')}>
-      {!grouped && (
-        <header>
-          <span className='author'>{message.mine ? 'You' : message.name}</span>
-          <time dateTime={new Date(message.at).toISOString()}>{time.format(message.at)}</time>
-        </header>
-      )}
-      <p className='text'>{message.text}</p>
-      {status && (
-        <p className={'delivery ' + status}>
-          <StatusIcon status={status} />
-          <span className={labelled ? '' : 'sr-only'}>{statusLabels[status]}</span>
+    <div
+      className={['message', message.mine && 'mine', first && 'first', last && 'last', status]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      {first && !message.mine && <p className='author'>{message.name}</p>}
+      <p className='bubble' title={full.format(message.at)}>
+        {message.text}
+      </p>
+      {labelled && (
+        <p className={'delivery ' + status} title={info.title}>
+          {status !== 'synced' && <Icon name={info.icon} size={12} />}
+          {info.label}
         </p>
       )}
-    </article>
-  )
-}
-
-function StatusIcon({ status }) {
-  const paths = {
-    pending: <path d='M8 4.5V8l2.2 1.4M14 8A6 6 0 1 1 2 8a6 6 0 0 1 12 0Z' />,
-    synced: <path d='m3.5 8.5 3 3 6-7' />,
-    failed: <path d='M8 4.5v4M8 11v.5M14 8A6 6 0 1 1 2 8a6 6 0 0 1 12 0Z' />
-  }
-  return (
-    <svg viewBox='0 0 16 16' width='14' height='14' aria-hidden='true'>
-      {paths[status]}
-    </svg>
-  )
-}
-
-function EmptyState({ state, online }) {
-  const { status, peers, created } = state
-
-  if (!online) {
-    return (
-      <Empty title='You’re offline'>
-        You can still write. Messages are saved on this device and sync when you’re back online and
-        a peer is here.
-      </Empty>
-    )
-  }
-  if (status === 'connected') {
-    return (
-      <Empty title='You’re connected'>
-        {peers.length === 1 ? `${peers[0].name} is here.` : `${peers.length} peers are here.`} Say
-        hello.
-      </Empty>
-    )
-  }
-  if (status === 'alone') {
-    return created ? (
-      <Empty title='Your room is ready'>
-        Share the room key with someone to start chatting. Nothing is stored on a server, so the
-        room is reachable only while one of you has the app open.
-      </Empty>
-    ) : (
-      <Empty title='No one else is here'>
-        Messages you write now are saved on this device and delivered when a peer comes online. If
-        you expected someone, check that the key is right.
-      </Empty>
-    )
-  }
-  return (
-    <Empty title='Looking for peers…' busy>
-      Announcing this room and searching for others in it. This usually takes a few seconds.
-    </Empty>
-  )
-}
-
-function Empty({ title, busy, children }) {
-  return (
-    <div className='empty'>
-      {busy && <span className='spinner' aria-hidden='true' />}
-      <h2>{title}</h2>
-      <p>{children}</p>
     </div>
   )
+}
+
+function TimeHeading({ at }) {
+  return (
+    <p className='time-heading'>
+      <strong>{dayName(at)}</strong> {time.format(at)}
+    </p>
+  )
+}
+
+function dayName(at) {
+  const day = new Date(at)
+  const today = new Date()
+  const yesterday = new Date(Date.now() - 864e5)
+  if (sameDay(day, today)) return 'Today'
+  if (sameDay(day, yesterday)) return 'Yesterday'
+  if (Date.now() - at < 6 * 864e5) return weekday.format(at)
+  return date.format(at)
+}
+
+function sameDay(a, b) {
+  return new Date(a).toDateString() === new Date(b).toDateString()
+}
+
+function sameAuthor(a, b) {
+  if (!a || !b || a.kind === 'notice' || b.kind === 'notice') return false
+  return a.mine === b.mine && a.writer === b.writer && a.name === b.name
 }

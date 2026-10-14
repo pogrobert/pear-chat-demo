@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, clipboard } = require('electron')
 const os = require('os')
 const path = require('path')
 const PearRuntime = require('pear-runtime')
+const native = require('./native.js')
 const FramedStream = require('framed-stream')
 
 const { isMac, isLinux, isWindows } = require('which-runtime')
@@ -124,12 +125,12 @@ function getWorker(specifier) {
 
 async function createWindow() {
   const win = new BrowserWindow({
-    width: 920,
-    height: 680,
-    minWidth: 420,
-    minHeight: 480,
-    title: appName,
-    backgroundColor: '#f7f6f3',
+    width: 960,
+    height: 660,
+    minWidth: 480,
+    minHeight: 420,
+    title: 'Pear Chat',
+    ...native.windowOptions(),
     webPreferences: {
       preload: path.join(__dirname, '..', 'electron', 'preload.js'),
       sandbox: true,
@@ -137,6 +138,8 @@ async function createWindow() {
       contextIsolation: true
     }
   })
+
+  native.attach(win)
 
   const devServerUrl = process.env.PEAR_DEV_SERVER_URL
 
@@ -208,6 +211,7 @@ if (!lock) {
   })
 
   app.whenReady().then(() => {
+    native.setup({ version })
     createWindow().catch((err) => {
       console.error('Failed to create window:', err)
       app.quit()

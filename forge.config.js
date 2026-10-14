@@ -87,6 +87,15 @@ module.exports = {
   ],
 
   hooks: {
+    // electron-liquid-glass loads its addon with node-gyp-build, which looks in
+    // prebuilds/darwin-<arch>. The universal-prebuilds plugin (made for Bare
+    // addons) renames that folder to darwin-universal, so rename it back.
+    packageAfterPrune: async (forgeConfig, buildPath, electronVersion, platform, arch) => {
+      if (platform !== 'darwin') return
+      const prebuilds = path.join(buildPath, 'node_modules', 'electron-liquid-glass', 'prebuilds')
+      const universal = path.join(prebuilds, 'darwin-universal')
+      if (fs.existsSync(universal)) fs.renameSync(universal, path.join(prebuilds, 'darwin-' + arch))
+    },
     readPackageJson: async (forgeConfig, packageJson) => {
       if (process.env.UPGRADE_KEY) {
         packageJson.upgrade = process.env.UPGRADE_KEY

@@ -32,17 +32,17 @@ npm start -- --storage /tmp/pear-chat-alice
 npm start -- --storage /tmp/pear-chat-bob
 ```
 
-In the first window pick a name and choose **Create a room**, then **Copy key**. In the second window paste the key and **Join room**.
+In the first window pick a name and choose **New Room**, then **Copy Room Key** (the toolbar button, or ⇧⌘C). In the second window choose **Join Room…** (⌘J), paste the key and **Join**.
 
 Things to try:
 
 | To see                 | Do this                                                                                        |
 | ---------------------- | ---------------------------------------------------------------------------------------------- |
-| Finding peers          | Create a room and watch the status in the top right                                            |
+| Finding peers          | Create a room and watch the status under the title                                             |
 | Pending, then synced   | Send a message before the second peer joins, then join                                         |
 | Presence               | Quit the second window (Cmd+Q) and watch the first                                             |
 | Catch-up after offline | With the second window closed, send a few messages from the first, then start the second again |
-| Offline                | Turn Wi-Fi off. The status changes to "You're offline" and you can keep writing                |
+| Offline                | Turn Wi-Fi off. The status changes to "Offline" and you can keep writing                       |
 | Start over             | Delete the storage directory                                                                   |
 
 ### Tests
@@ -57,7 +57,7 @@ Runs the room logic with real Hyperswarm and Corestore peers against a local DHT
 npm run build:ui && node test/e2e.js
 ```
 
-Starts two real app instances with separate storage on the real network, drives them through every state below, and saves a screenshot of each to `test/screenshots/`.
+Starts two real app instances with separate storage on the real network, drives them through every state below, and saves a capture of each app window to `test/screenshots/` (macOS asks once for Screen Recording permission).
 
 ## Share it with a `pear://` link
 
@@ -92,7 +92,20 @@ This is the layout of the official [hello-pear-electron](https://github.com/hole
 | `workers/main.js`         | Worker entry: one Corestore, one Hyperswarm, the IPC protocol |
 | `renderer/src/useChat.js` | Turns worker events into UI state, merges and orders messages |
 | `renderer/src/*.jsx`      | The screens and states                                        |
+| `electron/native.js`      | The Mac-native shell: Liquid Glass, menu bar, dialogs, accent |
 | `electron/`               | The template's shell, lightly adapted                         |
+
+### Looking native on macOS
+
+I followed Apple's Human Interface Guidelines (Materials, Sidebars, Toolbars, Typography, Color, Windows).
+
+- **Liquid Glass only on the navigation layer.** The sidebar sits on Apple's glass view (`NSGlassEffectView`) through [`electron-liquid-glass`](https://github.com/Meridius-Labs/electron-liquid-glass). The window is transparent, the sidebar's page background is transparent so the glass shows, and the conversation paints an opaque background. The HIG says not to use glass in the content layer. On macOS before 26 it falls back to the public vibrancy effect, and other platforms get an opaque window. With Reduce Transparency on, the sidebar becomes solid.
+- **A Mac window, not a web page.** Inset traffic lights, a draggable toolbar with the room title and status, SF Pro at the 13 pt body size, the user's accent color read from System Settings and updated live, a default button that loses its color when the window is in the background, and a selected sidebar row that turns grey the same way.
+- **Every action is in the menu bar** (Room > New Room ⌘N, Join Room… ⌘J, Copy Room Key ⇧⌘C, Remove Room…, View > Hide Sidebar ⌃⌘S), the standard Edit menu works in text fields, and right-click gives native context menus.
+- **Sheets and alerts.** Naming yourself and joining a room happen in sheets; removing a room asks with a native alert.
+- **Rooms are named after the people in them**, like Messages, because rooms have no names of their own.
+
+The catch: `NSGlassEffectView` is a private Apple API. A future macOS could change it, and an app using it could be rejected from the Mac App Store. For a demo I took that risk, and the fallback keeps the app working if the glass goes away.
 
 ### How peers find each other
 
@@ -118,7 +131,7 @@ This is the main tradeoff of the design. A peer whose clock is wrong will sort i
 
 <!-- TODO screenshot: "Looking for peers…" and the empty-room state -->
 
-**Pending vs synced.** A sent message is drawn immediately with a clock icon and "Saved here, not yet synced". It is marked synced when its position in my log is below `core.remoteContiguousLength`. Hypercore raises that value when a connected peer announces that it holds every block up to that point, and stores it on disk, so the state survives a restart. "Synced" therefore means at least one other peer reported having the message. It does not say which peer, or that everyone has it.
+**Pending vs synced.** A sent message is drawn immediately, faded, with a clock icon and "Waiting for a peer". It is marked delivered ("synced" in the code) when its position in my log is below `core.remoteContiguousLength`. Hypercore raises that value when a connected peer announces that it holds every block up to that point, and stores it on disk, so the state survives a restart. "Synced" therefore means at least one other peer reported having the message. It does not say which peer, or that everyone has it.
 
 <!-- TODO screenshot: a pending message next to a synced one -->
 
@@ -126,7 +139,7 @@ This is the main tradeoff of the design. A peer whose clock is wrong will sort i
 
 <!-- TODO screenshot: side panel with peers and a joined/left notice -->
 
-**Catch-up after reconnecting.** The hello tells me how long the other peer's copy of each log is. If that is longer than what I have read, I am behind by the difference. The banner shows "Catching up… 3 of 12 missed messages" while replication fetches them, then "You're up to date. 12 missed messages received." for a few seconds. Messages that arrive live never trigger it, because the comparison is only made from a hello.
+**Catch-up after reconnecting.** The hello tells me how long the other peer's copy of each log is. If that is longer than what I have read, I am behind by the difference. The banner shows "Catching up… 3 of 12 messages" while replication fetches them, then "Up to date. 12 messages synced from peers." for a few seconds. Messages that arrive live never trigger it, because the comparison is only made from a hello.
 
 <!-- TODO screenshot: the catch-up banner -->
 
@@ -149,6 +162,7 @@ This is the main tradeoff of the design. A peer whose clock is wrong will sort i
 - A peer can lie in its hello about how long a log is, which would leave the catch-up banner stuck.
 - The two-instance run was on one machine. I have not tested across two networks or difficult NATs.
 - The updater from the template still runs in the worker, but the UI does not show or apply updates.
+- Liquid Glass relies on a private Apple API (see above).
 
 ## Next steps
 
@@ -158,5 +172,5 @@ Nothing from the planned list was cut. What I would do next:
 - **Per-peer delivery**: show who has a message, using each connected peer's replication state.
 - **Detect a stalled DHT** as well as a missing network interface, and show reconnecting as its own state.
 - **Update UI** for the template's over-the-air updates, and a complete `pear stage` / `pear seed` run.
-- **More than one room**, and a way to see the key again after leaving.
+- **Room names** that peers share, instead of naming rooms after the people in them.
 - **Component tests** for the renderer, and a check with a screen reader.

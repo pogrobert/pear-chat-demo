@@ -22,18 +22,26 @@ const initial = {
 function reducer(state, event) {
   switch (event.type) {
     case 'joining':
-      return { ...initial, phase: 'joining' }
+      return { ...initial, phase: 'joining', key: event.key }
     case 'room':
       return {
         ...initial,
         phase: 'room',
+        openedAt: Date.now(),
+        joinError: null,
         key: event.key,
         created: event.created,
         status: event.status,
         peers: event.peers,
         syncedLength: event.syncedLength
       }
+    case 'join-start':
+      return { ...state, joinError: null }
     case 'join-failed':
+      // An invalid key leaves the current room open; only show the error.
+      if (event.reason === 'invalid-key' && state.phase === 'room') {
+        return { ...state, joinError: event.reason }
+      }
       return { ...initial, joinError: event.reason }
     case 'left':
       return initial
@@ -93,9 +101,12 @@ export function useChat(name) {
     phase: name && load('room') ? 'joining' : 'lobby'
   }))
 
+  // switching: the key is known to be valid (a new room, or one from the
+  // sidebar), so clear the screen right away. A pasted key is only shown once
+  // the worker accepts it, so a typo never closes the room you are in.
   const join = useCallback(
-    (key) => {
-      dispatch({ type: 'joining' })
+    (key, { switching = true } = {}) => {
+      dispatch(switching ? { type: 'joining', key } : { type: 'join-start' })
       write({ type: 'join', key, name })
     },
     [name]
@@ -110,7 +121,7 @@ export function useChat(name) {
         return // updater messages are plain strings; this demo has no update UI
       }
       if (event.type === 'room') save('room', event.key)
-      if (event.type === 'left' || event.type === 'join-failed') save('room', null)
+      if (event.type === 'left') save('room', null)
       if (event.type === 'peers') event.at = Date.now()
       dispatch(event)
     })

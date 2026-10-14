@@ -5,11 +5,25 @@ function toBuffer(data) {
   return Buffer.from(data.buffer, data.byteOffset, data.byteLength)
 }
 
+function subscribe(channel, listener) {
+  const wrap = (evt, data) => listener(data)
+  ipcRenderer.on(channel, wrap)
+  return () => ipcRenderer.removeListener(channel, wrap)
+}
+
 contextBridge.exposeInMainWorld('bridge', {
   pkg() {
     return ipcRenderer.sendSync('pkg')
   },
   copy: (text) => ipcRenderer.invoke('clipboard:write', text),
+  // native shell (electron/native.js)
+  ui: ipcRenderer.sendSync('ui:info'),
+  confirm: (options) => ipcRenderer.invoke('ui:confirm', options),
+  popup: (items) => ipcRenderer.invoke('ui:popup', items),
+  setMenuState: (state) => ipcRenderer.send('ui:menu-state', state),
+  onMenu: (listener) => subscribe('ui:menu', listener),
+  onAccent: (listener) => subscribe('ui:accent', listener),
+  onFocus: (listener) => subscribe('ui:focus', listener),
   applyUpdate: () => ipcRenderer.invoke('pear:applyUpdate'),
   appAfterUpdate: () => ipcRenderer.invoke('app:afterUpdate'),
   startWorker: (specifier) => ipcRenderer.invoke('pear:startWorker', specifier),

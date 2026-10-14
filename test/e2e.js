@@ -3,7 +3,7 @@
 // of each P2P state to test/screenshots/.
 //
 //   npm run build:ui && node test/e2e.js
-const { spawn } = require('child_process')
+const { spawn, execFileSync } = require('child_process')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -27,41 +27,44 @@ async function main() {
   fs.mkdirSync(shots, { recursive: true })
 
   const alice = await launch('alice', 9331)
+  await alice.see('Welcome to Pear Chat')
   await alice.type('#name', 'Alice')
   await alice.click('Continue')
-  await alice.click('Create a room')
+  await alice.shot('0-start')
+  await alice.click('New Room')
   await alice.see('Looking for peers…')
   await alice.shot('1-finding-peers')
-  await alice.see('Your room is ready')
+  await alice.see('Your Room Is Ready')
   await alice.shot('2-empty-room')
-  const key = await alice.text('.key')
+  const key = await alice.eval("localStorage.getItem('room')")
 
   await alice.send('Is anyone here?')
-  await alice.see('Saved here, not yet synced')
-  await alice.see('1 message is saved on this device')
+  await alice.see('Waiting for a peer')
+  await alice.see('1 message will be delivered when a peer is here.')
   await alice.shot('3-message-pending')
 
   let bob = await launch('bob', 9332)
   await bob.type('#name', 'Bob')
   await bob.click('Continue')
+  await bob.click('Join Room…')
   await bob.type('#key', 'not a key')
-  await bob.click('Join room')
+  await bob.click('Join')
   await bob.see('That doesn’t look like a room key')
   await bob.shot('4-invalid-key')
   await bob.type('#key', key)
-  await bob.click('Join room')
+  await bob.click('Join')
 
   await bob.see('Is anyone here?')
   await bob.see('Connected to Alice')
   await alice.see('Connected to Bob')
   await alice.see('Bob joined')
-  await alice.see('Synced')
-  await alice.gone('Saved here, not yet synced')
-  await alice.shot('5-message-synced')
+  await alice.see('Delivered')
+  await alice.gone('Waiting for a peer')
+  await alice.shot('5-message-delivered')
 
   await bob.send('Hi Alice, I am here')
   await alice.see('Hi Alice, I am here')
-  await bob.see('Synced')
+  await bob.see('Delivered')
   await bob.shot('6-presence')
 
   bob.quit()
@@ -69,18 +72,18 @@ async function main() {
   await alice.see('No one else is here')
   await alice.send('You missed this')
   await alice.send('And this')
-  await alice.see('2 messages are saved on this device')
+  await alice.see('2 messages will be delivered when a peer is here.')
   await alice.shot('7-peer-left')
 
   // give the old worker a moment to release its storage lock
   await new Promise((resolve) => setTimeout(resolve, 3000))
   bob = await launch('bob', 9332)
-  await bob.see('You’re up to date. 2 missed messages received.')
+  await bob.see('Up to date. 2 messages synced from peers.')
   await bob.see('And this')
   await bob.shot('8-caught-up')
   await alice.see('Connected to Bob')
-  await alice.gone('Saved here, not yet synced')
-  await alice.shot('9-synced-after-reconnect')
+  await alice.gone('Waiting for a peer')
+  await alice.shot('9-delivered-after-reconnect')
 }
 
 async function launch(name, port) {
@@ -127,7 +130,10 @@ async function launch(name, port) {
       await retry(() =>
         evaluate(`{
           const button = [...document.querySelectorAll('button')].find(
-            (b) => b.innerText === ${JSON.stringify(label)} && !b.disabled
+            (b) =>
+              (b.innerText === ${JSON.stringify(label)} ||
+                b.getAttribute('aria-label') === ${JSON.stringify(label)}) &&
+              !b.disabled
           )
           if (!button) throw new Error('no enabled button "${label}"')
           button.click()
@@ -148,13 +154,26 @@ async function launch(name, port) {
       await app.type('textarea', text)
       await app.click('Send')
     },
+    eval: evaluate,
+    // A capture of this app window only (by its window number), so the
+    // native glass is in the picture and nothing else on screen is.
     async shot(file) {
-      const { data } = await send('Page.captureScreenshot', { format: 'png' })
-      fs.writeFileSync(path.join(shots, file + '-' + name + '.png'), Buffer.from(data, 'base64'))
+      const id = windowId(child.pid)
+      const out = path.join(shots, file + '-' + name + '.png')
+      if (id) execFileSync('screencapture', ['-x', '-o', '-l', id, out])
     }
   }
   apps.push(app)
   return app
+}
+
+// The macOS window number of the app's window, looked up by process id.
+function windowId(pid) {
+  const script = `ObjC.import('CoreGraphics')
+    const list = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo($.kCGWindowListOptionOnScreenOnly, 0)))
+    const win = list.find((w) => w.kCGWindowOwnerPID === ${pid} && w.kCGWindowLayer === 0 && w.kCGWindowBounds.Height > 100)
+    win ? String(win.kCGWindowNumber) : ''`
+  return execFileSync('osascript', ['-l', 'JavaScript', '-e', script]).toString().trim()
 }
 
 // Minimal DevTools protocol client over the WebSocket built into Node.
