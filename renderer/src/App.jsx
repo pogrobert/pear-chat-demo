@@ -7,13 +7,16 @@ import Sidebar from './Sidebar.jsx'
 import Conversation, { Empty } from './Conversation.jsx'
 import { NameSheet, JoinSheet } from './Sheets.jsx'
 import Icon from './icons.jsx'
+import Onboarding from './Onboarding.jsx'
 import RoomDetails from './RoomDetails.jsx'
 
 const bridge = window.bridge
 
 export default function App() {
   const [name, setName] = useState(() => load('name') || '')
-  const [sheet, setSheet] = useState(name ? null : 'welcome')
+  const [sheet, setSheet] = useState(null)
+  const [onboarding, setOnboarding] = useState(!name)
+  const [pending, setPending] = useState(null) // what to do once onboarding hands over
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [copied, setCopied] = useState(false)
   const narrow = useMedia('(max-width: 620px)')
@@ -82,6 +85,21 @@ export default function App() {
     if (choice === 'join') setSheet('join')
   }, [chat])
 
+  // Onboarding ends with an action. It runs once the name is set and the
+  // worker has started, so the room is created under the new name.
+  function finishOnboarding(next, action) {
+    setOnboarding(false)
+    if (next !== name) changeName(next)
+    setPending(action)
+  }
+
+  useEffect(() => {
+    if (!name || !pending) return
+    if (pending === 'create') chat.join(null)
+    if (pending === 'join') setSheet('join')
+    setPending(null)
+  }, [name, pending, chat])
+
   function changeName(next) {
     save('name', next)
     setName(next)
@@ -97,6 +115,7 @@ export default function App() {
   useEffect(
     () =>
       bridge.onMenu((action) => {
+        if (action === 'welcome') setOnboarding(true)
         if (!name) return
         if (action === 'new-room') chat.join(null)
         if (action === 'join-room') setSheet('join')
@@ -109,103 +128,104 @@ export default function App() {
   )
 
   return (
-    <div className={'app' + (showSidebar ? '' : ' sidebar-hidden')}>
-      {showSidebar && (
-        <Sidebar
-          rooms={rooms}
-          current={state.key}
-          onSelect={(key) => key !== state.key && chat.join(key)}
-          onCopy={copyKey}
-          onRemove={removeRoom}
-          onAdd={addRoom}
-          onHide={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <main className='content'>
-        <header className='toolbar drag'>
-          {!showSidebar && !narrow && (
-            <button
-              className='tool'
-              onClick={() => setSidebarOpen(true)}
-              aria-label='Show sidebar'
-              title='Show Sidebar'
-            >
-              <Icon name='sidebar' />
-            </button>
-          )}
-          <div className='title'>
-            <h1>{inRoom ? roomLabel(current) : 'Pear Chat'}</h1>
-            {inRoom && <Status status={state.status} peers={state.peers} online={online} />}
-          </div>
-          {inRoom && (
-            <RoomDetails
-              people={current?.people || []}
-              peers={state.peers}
-              name={name}
-              roomKey={state.key}
-              copied={copied}
-              onCopy={() => copyKey()}
-              onRemove={() => current && removeRoom(current)}
-            />
-          )}
-          <span className='sr-only' role='status'>
-            {copied ? 'Room key copied' : ''}
-          </span>
-        </header>
-
-        {state.phase === 'crashed' ? (
-          <Empty
-            title='Connection Stopped'
-            action={
-              <button className='default' onClick={chat.restart}>
-                Restart
-              </button>
-            }
-          >
-            The background process that connects you to peers has stopped. Your messages are safe on
-            this Mac.
-          </Empty>
-        ) : inRoom ? (
-          <Conversation
-            state={state}
-            people={current?.people}
-            online={online}
-            onSend={chat.send}
-            onCopyKey={() => copyKey()}
+    <>
+      <div className={'app' + (showSidebar ? '' : ' sidebar-hidden')} inert={onboarding}>
+        {showSidebar && (
+          <Sidebar
+            rooms={rooms}
+            current={state.key}
+            onSelect={(key) => key !== state.key && chat.join(key)}
+            onCopy={copyKey}
+            onRemove={removeRoom}
+            onAdd={addRoom}
+            onHide={() => setSidebarOpen(false)}
           />
-        ) : state.phase === 'joining' ? (
-          <div className='content-fill' aria-busy='true' />
-        ) : (
-          <Empty
-            title='Start a Conversation'
-            action={
-              <div className='buttons'>
-                <button onClick={() => setSheet('join')}>Join Room…</button>
-                <button className='default' onClick={() => chat.join(null)}>
-                  New Room
-                </button>
-              </div>
-            }
-          >
-            Create a room and share its key, or join a room with a key someone sent you. Peers find
-            each other through a distributed hash table and connect directly.
-          </Empty>
         )}
-      </main>
 
-      {sheet === 'welcome' && <NameSheet firstRun onSave={changeName} />}
-      {sheet === 'rename' && (
-        <NameSheet name={name} onSave={changeName} onCancel={() => setSheet(null)} />
-      )}
-      {sheet === 'join' && (
-        <JoinSheet
-          error={state.joinError}
-          onJoin={(key) => chat.join(key, { switching: false })}
-          onCancel={() => setSheet(null)}
-        />
-      )}
-    </div>
+        <main className='content'>
+          <header className='toolbar drag'>
+            {!showSidebar && !narrow && (
+              <button
+                className='tool'
+                onClick={() => setSidebarOpen(true)}
+                aria-label='Show sidebar'
+                title='Show Sidebar'
+              >
+                <Icon name='sidebar' />
+              </button>
+            )}
+            <div className='title'>
+              <h1>{inRoom ? roomLabel(current) : 'Pear Chat'}</h1>
+              {inRoom && <Status status={state.status} peers={state.peers} online={online} />}
+            </div>
+            {inRoom && (
+              <RoomDetails
+                people={current?.people || []}
+                peers={state.peers}
+                name={name}
+                roomKey={state.key}
+                copied={copied}
+                onCopy={() => copyKey()}
+                onRemove={() => current && removeRoom(current)}
+              />
+            )}
+            <span className='sr-only' role='status'>
+              {copied ? 'Room key copied' : ''}
+            </span>
+          </header>
+
+          {state.phase === 'crashed' ? (
+            <Empty
+              title='Connection Stopped'
+              action={
+                <button className='default' onClick={chat.restart}>
+                  Restart
+                </button>
+              }
+            >
+              The background process that connects you to peers has stopped. Your messages are safe
+              on this Mac.
+            </Empty>
+          ) : inRoom ? (
+            <Conversation
+              state={state}
+              people={current?.people}
+              online={online}
+              onSend={chat.send}
+              onCopyKey={() => copyKey()}
+            />
+          ) : state.phase === 'joining' ? (
+            <div className='content-fill' aria-busy='true' />
+          ) : (
+            <Empty
+              title='Start a Conversation'
+              action={
+                <div className='buttons'>
+                  <button onClick={() => setSheet('join')}>Join Room…</button>
+                  <button className='default' onClick={() => chat.join(null)}>
+                    New Room
+                  </button>
+                </div>
+              }
+            >
+              Create a room and share its key, or join a room with a key someone sent you. Peers
+              find each other through a distributed hash table and connect directly.
+            </Empty>
+          )}
+        </main>
+        {sheet === 'rename' && (
+          <NameSheet name={name} onSave={changeName} onCancel={() => setSheet(null)} />
+        )}
+        {sheet === 'join' && (
+          <JoinSheet
+            error={state.joinError}
+            onJoin={(key) => chat.join(key, { switching: false })}
+            onCancel={() => setSheet(null)}
+          />
+        )}
+      </div>
+      {onboarding && <Onboarding initialName={name} onDone={finishOnboarding} />}
+    </>
   )
 }
 

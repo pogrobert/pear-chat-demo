@@ -119,10 +119,14 @@ const hues = [
   ['#6fe0d4', '#21a89a']
 ]
 
-function colorFor(name) {
+export function huesFor(name) {
   let hash = 0
   for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
-  const [top, bottom] = hues[hash % hues.length]
+  return hues[hash % hues.length]
+}
+
+function colorFor(name) {
+  const [top, bottom] = huesFor(name)
   return `linear-gradient(${top}, ${bottom})`
 }
 

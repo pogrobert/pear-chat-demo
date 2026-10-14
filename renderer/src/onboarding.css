@@ -1,0 +1,686 @@
+/* First-run onboarding. A once-per-person moment, so it gets more motion than
+   everyday UI, but every curve and duration follows the same rules: strong
+   ease-out for entrances, ease-in-out for things moving on screen, nothing
+   starting from scale(0), and plain fades under Reduce Motion.
+   Base styles are the final state; keyframes describe how each part arrives. */
+
+:root {
+  --ob-card: #ffffff;
+  --ob-tile: linear-gradient(#ffffff, #f2f3f6);
+  --ob-tile-edge: rgb(0 0 0 / 0.06);
+  --ob-wash: rgb(244 244 246 / 0.55);
+  --ob-chip: rgb(255 255 255 / 0.85);
+  --ob-aurora-opacity: 0.85;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ob-card: #242426;
+    --ob-tile: linear-gradient(#3b3b3f, #2d2d31);
+    --ob-tile-edge: rgb(255 255 255 / 0.08);
+    --ob-wash: rgb(22 22 24 / 0.55);
+    --ob-chip: rgb(255 255 255 / 0.1);
+    --ob-aurora-opacity: 0.62;
+  }
+}
+
+/* --- the overlay and the card --- */
+
+.onboarding {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--ob-wash);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+  backdrop-filter: blur(18px) saturate(1.15);
+  transition: opacity 300ms ease;
+}
+
+@starting-style {
+  .onboarding {
+    opacity: 0;
+  }
+}
+
+.onboarding[data-state='closing'] {
+  opacity: 0;
+}
+
+.ob-drag {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 52px;
+}
+
+.ob-card {
+  position: relative;
+  width: min(520px, calc(100vw - 40px));
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--ob-card);
+  box-shadow:
+    0 0 0 0.5px var(--separator),
+    0 30px 80px rgb(0 0 0 / 0.25),
+    0 6px 18px rgb(0 0 0 / 0.1);
+  transition:
+    opacity 520ms var(--ease-out),
+    transform 520ms var(--ease-out);
+}
+
+@starting-style {
+  .ob-card {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+}
+
+.onboarding[data-state='closing'] .ob-card {
+  opacity: 0;
+  transform: scale(0.97);
+  transition-duration: 250ms;
+}
+
+/* --- aurora: three soft blobs whose colors change per card --- */
+
+.ob-aurora {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 250px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ob-aurora i {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  filter: blur(50px);
+  opacity: var(--ob-aurora-opacity);
+  transition: background-color 900ms ease;
+  animation: drift 24s ease-in-out infinite alternate;
+}
+
+.ob-aurora i:nth-child(1) {
+  top: -110px;
+  left: -70px;
+}
+
+.ob-aurora i:nth-child(2) {
+  top: -90px;
+  right: -60px;
+  animation-duration: 30s;
+  animation-direction: alternate-reverse;
+}
+
+.ob-aurora i:nth-child(3) {
+  top: 70px;
+  left: 30%;
+  animation-duration: 36s;
+}
+
+.ob-aurora::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 35%, var(--ob-card) 92%);
+  content: '';
+}
+
+.ob-aurora[data-step='0'] i:nth-child(1) {
+  background-color: #9fd3ff;
+}
+.ob-aurora[data-step='0'] i:nth-child(2) {
+  background-color: #c9b6ff;
+}
+.ob-aurora[data-step='0'] i:nth-child(3) {
+  background-color: #a8f0d2;
+}
+.ob-aurora[data-step='1'] i:nth-child(1) {
+  background-color: #ffd59a;
+}
+.ob-aurora[data-step='1'] i:nth-child(2) {
+  background-color: #ffb3c7;
+}
+.ob-aurora[data-step='1'] i:nth-child(3) {
+  background-color: #c9b6ff;
+}
+.ob-aurora[data-step='2'] i:nth-child(1) {
+  background-color: #a8f0d2;
+}
+.ob-aurora[data-step='2'] i:nth-child(2) {
+  background-color: #8fd8ff;
+}
+.ob-aurora[data-step='2'] i:nth-child(3) {
+  background-color: #d6f5a8;
+}
+.ob-aurora[data-step='3'] i:nth-child(1) {
+  background-color: #c9b6ff;
+}
+.ob-aurora[data-step='3'] i:nth-child(2) {
+  background-color: #9fd3ff;
+}
+.ob-aurora[data-step='3'] i:nth-child(3) {
+  background-color: #ffc6a8;
+}
+
+.ob-skip {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  right: 18px;
+  height: 26px;
+  padding: 0 12px;
+  background: color-mix(in srgb, var(--ob-card) 55%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: none;
+  font-size: 12px;
+}
+
+/* --- cards: the new one slides in the direction you're going --- */
+
+.ob-steps {
+  position: relative;
+  height: 386px;
+}
+
+.ob-step {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ob-step[data-state='enter'] .ob-art,
+.ob-step[data-state='enter'] .ob-copy > * {
+  animation: ob-in 480ms var(--ease-out) both;
+  animation-delay: calc(var(--i) * 60ms + 40ms);
+}
+
+/* the picture travels further than the text: a little depth */
+.ob-art {
+  --travel: 44px;
+}
+
+.ob-copy > * {
+  --travel: 22px;
+}
+
+.ob-step[data-state='exit'] {
+  animation: ob-out 240ms var(--ease-out) both;
+  pointer-events: none;
+}
+
+@keyframes ob-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--dir) * var(--travel)));
+  }
+}
+
+@keyframes ob-out {
+  to {
+    opacity: 0;
+    transform: translateX(calc(var(--dir) * -24px));
+  }
+}
+
+.ob-art {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  height: 232px;
+}
+
+.ob-copy {
+  padding: 0 36px;
+}
+
+.ob-copy h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.ob-copy p {
+  max-width: 400px;
+  margin: 0;
+  color: var(--secondary);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.ob-field {
+  margin-top: 14px;
+}
+
+.ob-field input {
+  height: 34px;
+  font-size: 14px;
+}
+
+.ob-field .error {
+  margin: 6px 0 0;
+}
+
+/* --- footer: actions and page dots --- */
+
+.ob-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 36px 30px;
+}
+
+.ob-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ob-actions button {
+  height: 30px;
+  padding: 0 18px;
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 160ms var(--ease-out);
+}
+
+.ob-actions button:active {
+  transform: scale(0.97);
+}
+
+@starting-style {
+  .ob-actions button {
+    opacity: 0;
+  }
+}
+
+.ob-dots {
+  position: relative;
+  display: flex;
+  gap: 6px;
+}
+
+.ob-dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--tertiary);
+  box-shadow: none;
+}
+
+.ob-dot-active {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--label);
+  transform: translateX(calc(var(--step) * 12px));
+  transition: transform 350ms var(--ease-in-out);
+  pointer-events: none;
+}
+
+/* --- shared art pieces --- */
+
+.ob-tile {
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  background: var(--ob-tile);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.45),
+    0 0 0 0.5px var(--ob-tile-edge),
+    0 10px 30px rgb(0 0 0 / 0.16);
+  color: var(--label);
+}
+
+/* 1. two Macs, a server struck out, a direct line */
+
+.art-direct {
+  display: flex;
+  align-items: center;
+}
+
+.mac {
+  width: 96px;
+  height: 96px;
+}
+
+.from-left,
+.from-right {
+  animation: ob-slide 600ms var(--ease-out) both 120ms;
+}
+
+.from-left {
+  --from: -18px;
+}
+
+.from-right {
+  --from: 18px;
+}
+
+@keyframes ob-slide {
+  from {
+    opacity: 0;
+    transform: translateX(var(--from));
+  }
+}
+
+.wire {
+  position: relative;
+  width: 132px;
+  height: 96px;
+}
+
+.wire-server {
+  position: absolute;
+  top: 2px;
+  left: calc(50% - 23px);
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 34px;
+  border: 1.5px dashed var(--tertiary);
+  border-radius: 11px;
+  color: var(--secondary);
+  opacity: 0.35;
+  transform: translateY(-4px);
+  animation: ob-server 1500ms var(--ease-out) both 350ms;
+}
+
+.wire-server::after {
+  position: absolute;
+  width: 58px;
+  height: 1.5px;
+  background: var(--secondary);
+  transform: rotate(-30deg);
+  animation: ob-strike 260ms var(--ease-out) both 1000ms;
+  content: '';
+}
+
+@keyframes ob-server {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.92);
+  }
+  30%,
+  70% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ob-strike {
+  from {
+    transform: rotate(-30deg) scaleX(0);
+  }
+}
+
+.wire-line {
+  position: absolute;
+  top: calc(50% - 1px);
+  right: 6px;
+  left: 6px;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, var(--accent), var(--green));
+  transform-origin: left;
+  animation: ob-draw 600ms var(--ease-in-out) both 1300ms;
+}
+
+@keyframes ob-draw {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.wire-packet {
+  position: absolute;
+  top: calc(50% - 5px);
+  left: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 3px var(--accent),
+    0 0 12px var(--accent);
+  animation:
+    ob-fade-in 200ms ease both 1850ms,
+    ob-travel 1300ms var(--ease-in-out) 2000ms 4 alternate both;
+}
+
+@keyframes ob-travel {
+  to {
+    transform: translateX(110px);
+  }
+}
+
+@keyframes ob-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 2. a key that settles, a shine, then people arriving */
+
+.art-key {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.keycap {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  height: 64px;
+  padding: 0 22px;
+  overflow: hidden;
+  border-radius: 18px;
+  font-size: 17px;
+  letter-spacing: 0.03em;
+}
+
+.keycap .mono {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.5) 50%, transparent 65%);
+  transform: translateX(100%);
+  animation: ob-shine 900ms var(--ease-in-out) both 1300ms;
+}
+
+@keyframes ob-shine {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+.joiners {
+  display: flex;
+  gap: 8px;
+}
+
+.joiner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  background: var(--ob-chip);
+  box-shadow: 0 0 0 0.5px var(--ob-tile-edge);
+  font-size: 12px;
+  animation: ob-pop 420ms var(--ease-out) both;
+  animation-delay: calc(1800ms + var(--j) * 120ms);
+}
+
+@keyframes ob-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+}
+
+/* 3. a message that waits, then is delivered */
+
+.art-offline {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 300px;
+  padding: 14px;
+  border-radius: 20px;
+  font-size: 13px;
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: var(--secondary);
+  font-size: 11px;
+}
+
+.chat-head .dot.on {
+  background: var(--green);
+}
+
+.chat-head span:last-child,
+.chat-status {
+  transition: opacity 300ms ease;
+}
+
+@starting-style {
+  .chat-head span:last-child,
+  .chat-status {
+    opacity: 0;
+  }
+}
+
+.chat-bubble {
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: var(--bubble);
+}
+
+.chat-bubble.mine {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #fff;
+  transition: background-color 400ms ease;
+}
+
+.chat-bubble.mine.pending {
+  background: color-mix(in srgb, var(--accent) 50%, var(--ob-card));
+}
+
+.chat-status {
+  align-self: flex-end;
+  margin: 0;
+  color: var(--secondary);
+  font-size: 11px;
+}
+
+/* 4. your avatar */
+
+.art-name {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.ob-avatar {
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  background-color: var(--bottom);
+  background-image: linear-gradient(rgb(255 255 255 / 0.3), transparent 70%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
+    0 12px 30px rgb(0 0 0 / 0.18);
+  color: #fff;
+  font-size: 38px;
+  font-weight: 600;
+  transition: background-color 350ms ease;
+}
+
+.ob-initials {
+  animation: ob-initials 220ms var(--ease-out);
+}
+
+@keyframes ob-initials {
+  from {
+    opacity: 0.4;
+    transform: scale(0.92);
+  }
+}
+
+.ob-avatar-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+@keyframes drift {
+  to {
+    transform: translate(22px, 14px) scale(1.08);
+  }
+}
+
+/* Reduce Motion: cards cross-fade, the pictures appear in their final state. */
+@media (prefers-reduced-motion: reduce) {
+  .ob-card,
+  .onboarding[data-state='closing'] .ob-card {
+    transform: none;
+  }
+  .ob-step[data-state='enter'] .ob-art,
+  .ob-step[data-state='enter'] .ob-copy > * {
+    animation-name: ob-fade-in;
+    animation-delay: 0ms;
+  }
+  .ob-step[data-state='exit'] {
+    animation: ob-fade-out 200ms ease both;
+  }
+  .ob-aurora i,
+  .from-left,
+  .from-right,
+  .wire-server,
+  .wire-server::after,
+  .wire-line,
+  .shine,
+  .joiner,
+  .ob-initials {
+    animation: none;
+  }
+  .wire-packet {
+    display: none;
+  }
+  .ob-dot-active {
+    transition: none;
+  }
+}
+
+@keyframes ob-fade-out {
+  to {
+    opacity: 0;
+  }
+}

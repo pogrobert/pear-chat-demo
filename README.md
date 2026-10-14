@@ -86,26 +86,28 @@ view only                                 spawns + relays              Hyperswar
 
 This is the layout of the official [hello-pear-electron](https://github.com/holepunchto/hello-pear-electron) template. All P2P code runs in a [Bare](https://github.com/holepunchto/bare) worker started through `pear-runtime`. The renderer is a sandboxed web page that only exchanges small JSON messages with it.
 
-| File                      | What it does                                                  |
-| ------------------------- | ------------------------------------------------------------- |
-| `workers/room.js`         | The P2P logic for one room. Start here.                       |
-| `workers/main.js`         | Worker entry: one Corestore, one Hyperswarm, the IPC protocol |
-| `renderer/src/useChat.js` | Turns worker events into UI state, merges and orders messages |
-| `renderer/src/*.jsx`      | The screens and states                                        |
-| `electron/native.js`      | The Mac-native shell: Liquid Glass, menu bar, dialogs, accent |
-| `electron/`               | The template's shell, lightly adapted                         |
+| File                      | What it does                                                      |
+| ------------------------- | ----------------------------------------------------------------- |
+| `workers/room.js`         | The P2P logic for one room. Start here.                           |
+| `workers/main.js`         | Worker entry: one Corestore, one Hyperswarm, the IPC protocol     |
+| `renderer/src/useChat.js` | Turns worker events into UI state, merges and orders messages     |
+| `renderer/src/*.jsx`      | The screens and states                                            |
+| `electron/native.js`      | The Mac-native shell: sidebar material, menu bar, dialogs, accent |
+| `electron/`               | The template's shell, lightly adapted                             |
 
 ### Looking native on macOS
 
 I followed Apple's Human Interface Guidelines (Materials, Sidebars, Toolbars, Typography, Color, Windows).
 
-- **Liquid Glass only on the navigation layer.** The sidebar sits on Apple's glass view (`NSGlassEffectView`) through [`electron-liquid-glass`](https://github.com/Meridius-Labs/electron-liquid-glass). The window is transparent, the sidebar's page background is transparent so the glass shows, and the conversation paints an opaque background. The HIG says not to use glass in the content layer. On macOS before 26 it falls back to the public vibrancy effect, and other platforms get an opaque window. With Reduce Transparency on, the sidebar becomes solid.
+- **A translucent sidebar, an opaque conversation.** The sidebar uses the standard macOS sidebar material (Electron's `vibrancy: 'sidebar'`), and the conversation paints its own background, as the HIG separates navigation from content. Other platforms get an opaque window, and with Reduce Transparency on the sidebar becomes solid.
 - **A Mac window, not a web page.** Inset traffic lights, a draggable toolbar with the room title and status, SF Pro at the 13 pt body size, the user's accent color read from System Settings and updated live, a default button that loses its color when the window is in the background, and a selected sidebar row that turns grey the same way.
 - **Every action is in the menu bar** (Room > New Room ⌘N, Join Room… ⌘J, Copy Room Key ⇧⌘C, Remove Room…, View > Hide Sidebar ⌃⌘S), the standard Edit menu works in text fields, and right-click gives native context menus.
-- **Sheets and alerts.** Naming yourself and joining a room happen in sheets; removing a room asks with a native alert.
+- **Onboarding.** First launch shows four short cards over the blurred app, each showing one idea with a small animation: no server in the middle, a room is a key, offline is fine, then your name and Create Room or Join with Key. Replay it from Help > Show Welcome.
+- **Sheets and alerts.** Joining a room and renaming yourself happen in sheets; removing a room asks with a native alert.
+- **Motion with a purpose.** New messages rise in from their side; history, room switching and keyboard actions stay instant. Curves and durations follow Emil Kowalski's animation guidance, and Reduce Motion keeps fades but drops movement.
 - **Rooms are named after the people in them**, like Messages, because rooms have no names of their own.
 
-The catch: `NSGlassEffectView` is a private Apple API. A future macOS could change it, and an app using it could be rejected from the Mac App Store. For a demo I took that risk, and the fallback keeps the app working if the glass goes away.
+I tried Liquid Glass first, through a native addon for Apple's private glass view. Only the sidebar could use the real material; toolbar controls would have needed CSS imitations, and those looked like flat grey pills next to the real thing. A polished standard Mac app was better than a half-glass one, so I took it out.
 
 ### How peers find each other
 
@@ -162,7 +164,6 @@ This is the main tradeoff of the design. A peer whose clock is wrong will sort i
 - A peer can lie in its hello about how long a log is, which would leave the catch-up banner stuck.
 - The two-instance run was on one machine. I have not tested across two networks or difficult NATs.
 - The updater from the template still runs in the worker, but the UI does not show or apply updates.
-- Liquid Glass relies on a private Apple API (see above).
 
 ## Next steps
 

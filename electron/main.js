@@ -130,6 +130,7 @@ async function createWindow() {
     minWidth: 480,
     minHeight: 420,
     title: 'Pear Chat',
+    show: false, // shown once the first frame is painted, like a native app
     ...native.windowOptions(),
     webPreferences: {
       preload: path.join(__dirname, '..', 'electron', 'preload.js'),
@@ -140,6 +141,7 @@ async function createWindow() {
   })
 
   native.attach(win)
+  win.once('ready-to-show', () => win.show())
 
   const devServerUrl = process.env.PEAR_DEV_SERVER_URL
 
