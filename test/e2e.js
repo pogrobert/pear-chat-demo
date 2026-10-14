@@ -79,6 +79,16 @@ async function main() {
   await alice.hasNot('.typing-bubble')
   await bob.see('Seen by Alice')
   await alice.see('2 here')
+  // A one-to-one room shows the other person's avatar, drawn from their key:
+  // Bob's "Alice" row looks exactly like Alice's own avatar in her window.
+  const svg = (selector) =>
+    `document.querySelector('${selector} svg').outerHTML.replace(/(id|mask|filter|width|height)="[^"]*"|url\\(#[^)]*\\)/g, '')`
+  await retry(async () => {
+    const own = await alice.eval(svg('.me-bar .avatar'))
+    const seenByBob = await bob.eval(svg('.room-row .avatar'))
+    if (own !== seenByBob) throw new Error("Bob's room row does not show Alice's avatar")
+  })
+  console.log("ok - bob's room row shows Alice's avatar")
   await alice.has('.me-bar .dot.on')
   await bob.shot('6-presence')
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import type { SavedRoom } from '../types.ts'
+import type { Member, SavedRoom } from '../types.ts'
 
 // Sidebar width limits; read by the store while it is created, so declared first.
 export const SIDEBAR = { min: 220, max: 420, default: 290, collapseBelow: 150 }
@@ -21,7 +21,10 @@ interface SavedState {
   setSidebarWidth(width: number): void
   setReceipts(on: boolean): void
   setLastRoom(key: string | null): void
-  noteRoom(key: string, update: { people: string[]; last?: SavedRoom['last'] }): void
+  noteRoom(
+    key: string,
+    update: { people: string[]; members: Member[]; last?: SavedRoom['last'] }
+  ): void
   removeRoom(key: string): void
 }
 
@@ -36,7 +39,7 @@ export const useSaved = create<SavedState>()(
       setLastRoom: (lastRoom) => set({ lastRoom }),
 
       // Who has been in a room and what was said last, for the sidebar.
-      noteRoom: (key, { people, last }) =>
+      noteRoom: (key, { people, members, last }) =>
         set((state) => {
           const room = state.rooms.find((r) => r.key === key) ?? {
             key,
@@ -44,12 +47,17 @@ export const useSaved = create<SavedState>()(
             addedAt: Date.now()
           }
           const merged = [...new Set([...room.people, ...people])]
+          // Members by key; a later name for the same key replaces the earlier one.
+          const byKey = new Map((room.members ?? []).map((m) => [m.key, m]))
+          for (const member of members) byKey.set(member.key, member)
+          const nextMembers = [...byKey.values()]
           const unchanged =
             state.rooms.includes(room) &&
             merged.length === room.people.length &&
+            JSON.stringify(nextMembers) === JSON.stringify(room.members ?? []) &&
             last?.at === room.last?.at
           if (unchanged) return state
-          const next = { ...room, people: merged, last: last ?? room.last }
+          const next = { ...room, people: merged, members: nextMembers, last: last ?? room.last }
           return { rooms: sortByActivity([...state.rooms.filter((r) => r !== room), next]) }
         }),
 

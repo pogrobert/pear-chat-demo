@@ -128,6 +128,10 @@ function remember(state: ChatState, event: ChatEvent) {
       ...state.peers.map((peer) => peer.name),
       ...messages.filter((m) => !m.mine).map((m) => m.name)
     ],
+    members: [
+      ...messages.flatMap((m) => (!m.mine && m.writer ? [{ key: m.writer, name: m.name }] : [])),
+      ...state.peers.map((peer) => ({ key: peer.id, name: peer.name }))
+    ],
     last: last && { text: last.text, name: last.mine ? 'You' : last.name, at: last.at }
   })
 }

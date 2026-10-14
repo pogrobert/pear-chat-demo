@@ -40,9 +40,15 @@ export interface Catchup {
   total: number
 }
 
+export interface Member {
+  key: string // their writer key in this room: what their avatar is drawn from
+  name: string
+}
+
 export interface SavedRoom {
   key: string
   people: string[]
+  members?: Member[] // missing in rooms saved by earlier versions
   addedAt: number
   last?: { text: string; name: string; at: number }
 }

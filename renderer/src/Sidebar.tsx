@@ -1,7 +1,7 @@
 import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import Icon from './icons.tsx'
-import Avatar from './Avatar.tsx'
+import Avatar, { RoomAvatar } from './Avatar.tsx'
 import Resizer from './Resizer.tsx'
 import { useChat } from './state/chat.ts'
 import { roomLabel, useSaved } from './state/saved.ts'
@@ -180,7 +180,7 @@ export default function Sidebar({
                     onContextMenu={(event) => onContextMenu(event, room)}
                     title={room.last ? `${room.last.name}: ${room.last.text}` : 'No messages yet'}
                   >
-                    <Avatar seed={room.key} size='medium' online={live} />
+                    <RoomAvatar room={room} online={live} />
                     <span className='room-name'>{roomLabel(room)}</span>
                     {live && <span className='room-meta live'>{peers.length + 1} here</span>}
                   </button>
