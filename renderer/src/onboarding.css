@@ -8,9 +8,8 @@
   --ob-card: #ffffff;
   --ob-tile: linear-gradient(#ffffff, #f2f3f6);
   --ob-tile-edge: rgb(0 0 0 / 0.06);
-  --ob-wash: rgb(244 244 246 / 0.72);
-  --ob-shadow:
-    0 0 0 0.5px var(--separator), 0 24px 64px rgb(0 0 0 / 0.18), 0 4px 14px rgb(0 0 0 / 0.08);
+  --ob-canvas: #ececee;
+  --ob-edge: rgb(0 0 0 / 0.08);
   --ob-chip: rgb(255 255 255 / 0.85);
   --ob-aurora-opacity: 0.85;
 }
@@ -20,10 +19,8 @@
     --ob-card: #242426;
     --ob-tile: linear-gradient(#3b3b3f, #2d2d31);
     --ob-tile-edge: rgb(255 255 255 / 0.08);
-    --ob-wash: rgb(20 20 22 / 0.84);
-    /* On a near-black backdrop a large soft shadow only reads as a muddy box;
-       a tight shadow and a faint light rim separate the card instead. */
-    --ob-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.1), 0 12px 32px rgb(0 0 0 / 0.35);
+    --ob-canvas: #141416;
+    --ob-edge: rgb(255 255 255 / 0.09);
     --ob-chip: rgb(255 255 255 / 0.1);
     --ob-aurora-opacity: 0.62;
   }
@@ -37,9 +34,8 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: var(--ob-wash);
-  -webkit-backdrop-filter: blur(30px) saturate(1.1);
-  backdrop-filter: blur(30px) saturate(1.1);
+  /* a plain canvas: nothing behind the card to bleed through as a halo */
+  background: var(--ob-canvas);
   transition: opacity 300ms ease;
 }
 
@@ -65,7 +61,8 @@
   overflow: hidden;
   border-radius: 28px;
   background: var(--ob-card);
-  box-shadow: var(--ob-shadow);
+  /* no shadow halo: a hairline edge is enough to separate the card */
+  box-shadow: 0 0 0 0.5px var(--ob-edge);
   transition:
     opacity 520ms var(--ease-out),
     transform 520ms var(--ease-out);
