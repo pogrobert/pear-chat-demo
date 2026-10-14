@@ -6,8 +6,9 @@ I built this to learn [Pear](https://docs.pears.com) and Holepunch's P2P model (
 
 Built with AI-assisted development; product and UX decisions are mine.
 
-<!-- TODO screenshot: the room with two peers chatting (hero image) -->
-<!-- TODO GIF: Bob quits, Alice sends two messages (pending), Bob returns and catches up -->
+![Two Macs running Pear Chat: Alice creates a room, Bob joins with its key, they chat with typing and read receipts, Bob goes offline while Alice keeps writing, then Bob comes back and catches up, and the Network panel shows the live connection and logs](docs/demo.gif)
+
+_Two real instances on one Mac, recorded by a script that drives them; nothing is staged or mocked._
 
 ## Run it locally
 
@@ -57,7 +58,7 @@ Runs the room logic with real Hyperswarm and Corestore peers against a local DHT
 npm run build:ui && node test/e2e.js
 ```
 
-Starts two real app instances with separate storage on the real network, drives them through every state below, and saves a capture of each app window to `test/screenshots/` (macOS asks once for Screen Recording permission).
+Starts three real app instances with separate storage on the real network, drives them through every state below, and saves a screenshot of each state to `test/screenshots/`.
 
 ## Share it with a `pear://` link
 
