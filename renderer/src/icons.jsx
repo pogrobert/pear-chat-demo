@@ -5,6 +5,7 @@ import {
   CheckIcon,
   ClockIcon,
   CopyIcon,
+  GearSixIcon,
   InfoIcon,
   KeyIcon,
   MagnifyingGlassIcon,
@@ -32,7 +33,8 @@ const icons = {
   clock: ClockIcon,
   alert: WarningCircleIcon,
   bubbles: ChatsCircleIcon,
-  key: KeyIcon
+  key: KeyIcon,
+  gear: GearSixIcon
 }
 
 export default function Icon({ name, size = 18, weight = 'regular' }) {

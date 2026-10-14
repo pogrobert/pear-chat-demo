@@ -1,24 +1,56 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Icon from './icons.jsx'
 import { roomLabel } from './useRooms.js'
 
 const bridge = window.bridge
-const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
-const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'long' })
-const date = new Intl.DateTimeFormat(undefined, {
-  day: '2-digit',
-  month: '2-digit',
-  year: '2-digit'
-})
 
-export default function Sidebar({ rooms, current, onSelect, onCopy, onRemove, onAdd, onHide }) {
+// A room key is 52 z-base-32 characters (or 64 hex); pear:// links work too.
+const KEY = /^(pear:\/\/)?([a-z0-9]{52}|[0-9a-f]{64})$/i
+
+// Rooms you have been in, and at the bottom, you and your connection to the
+// network. Live presence ("2 here") is only known for the open room, because
+// the app is connected to one room at a time; the others show how many
+// people have been in them.
+export default function Sidebar({
+  rooms,
+  current,
+  peers,
+  status,
+  online,
+  name,
+  joinError,
+  onSelect,
+  onAdd,
+  onJoinKey,
+  onCopy,
+  onRemove,
+  onHide,
+  onRename,
+  onWelcome
+}) {
   const [query, setQuery] = useState('')
-  const q = query.trim().toLowerCase()
-  const shown = q
-    ? rooms.filter((room) =>
-        (roomLabel(room) + ' ' + (room.last?.text || '')).toLowerCase().includes(q)
-      )
-    : rooms
+  const [joining, setJoining] = useState(false)
+  const q = query.trim()
+  const isKey = KEY.test(q)
+  const shown =
+    q && !isKey
+      ? rooms.filter((room) =>
+          (roomLabel(room) + ' ' + (room.last?.text || '')).toLowerCase().includes(q.toLowerCase())
+        )
+      : rooms
+
+  function joinKey() {
+    setJoining(true)
+    onJoinKey(q)
+  }
+
+  // A successful join opens the room; clear the field then.
+  useEffect(() => {
+    if (!joining || joinError || !current) return
+    setQuery('')
+    setJoining(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current])
 
   // Arrow keys move through the list, as in any Mac source list.
   function onKeyDown(event) {
@@ -43,69 +75,130 @@ export default function Sidebar({ rooms, current, onSelect, onCopy, onRemove, on
     if (choice === 'remove') onRemove(room)
   }
 
+  async function openSettings() {
+    const choice = await bridge.popup([
+      { id: 'rename', label: 'Change Display Name…' },
+      { id: 'welcome', label: 'Show Welcome' }
+    ])
+    if (choice === 'rename') onRename()
+    if (choice === 'welcome') onWelcome()
+  }
+
   return (
     <nav className='sidebar' aria-label='Rooms'>
       <div className='sidebar-top drag'>
         <button className='tool' onClick={onHide} aria-label='Hide sidebar' title='Hide Sidebar'>
           <Icon name='sidebar' />
         </button>
-        <button
-          className='tool'
-          onClick={onAdd}
-          aria-label='New room'
-          title='New Room or Join Room'
-        >
-          <Icon name='compose' />
-        </button>
       </div>
 
-      <label className='search'>
+      <label className='find'>
         <Icon name='search' size={15} />
         <input
           type='search'
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => event.key === 'Escape' && setQuery('')}
-          placeholder='Search'
-          aria-label='Search rooms'
+          onChange={(event) => {
+            setQuery(event.target.value)
+            setJoining(false)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setQuery('')
+            if (event.key === 'Enter' && isKey) joinKey()
+          }}
+          placeholder='Find or join a room'
+          aria-label='Find a room, or paste a room key to join it'
           spellCheck={false}
         />
       </label>
+      {isKey && (
+        <button className='join-key' onClick={joinKey}>
+          <Icon name='key' size={16} />
+          {joining && !joinError ? 'Joining…' : 'Join room with this key'}
+        </button>
+      )}
+      {isKey && joining && joinError && (
+        <p className='find-error' role='alert'>
+          Couldn’t join with that key.
+        </p>
+      )}
+
+      <div className='section-header'>
+        <h2>Rooms</h2>
+        <button
+          className='tool small'
+          onClick={onAdd}
+          aria-label='New room'
+          title='New Room or Join Room'
+        >
+          <Icon name='plus' size={15} />
+        </button>
+      </div>
 
       <div className='sidebar-scroll'>
         {rooms.length === 0 ? (
-          <p className='sidebar-empty'>No Rooms</p>
+          <p className='sidebar-empty'>No rooms yet</p>
         ) : shown.length === 0 ? (
-          <p className='sidebar-empty'>No Results</p>
+          <p className='sidebar-empty'>No results</p>
         ) : (
           <ul className='rooms' onKeyDown={onKeyDown}>
-            {shown.map((room) => (
-              <li key={room.key}>
-                <button
-                  id={'room-' + room.key}
-                  className='room-row'
-                  aria-current={room.key === current ? 'true' : undefined}
-                  onClick={() => onSelect(room.key)}
-                  onContextMenu={(event) => onContextMenu(event, room)}
-                >
-                  <Avatar names={room.people} />
-                  <span className='room-text'>
-                    <span className='room-line'>
-                      <span className='room-name'>{roomLabel(room)}</span>
-                      {room.last && <span className='room-time'>{when(room.last.at)}</span>}
+            {shown.map((room) => {
+              const open = room.key === current
+              const live = open && peers.length > 0
+              return (
+                <li key={room.key}>
+                  <button
+                    id={'room-' + room.key}
+                    className='room-row'
+                    aria-current={open ? 'true' : undefined}
+                    onClick={() => onSelect(room.key)}
+                    onContextMenu={(event) => onContextMenu(event, room)}
+                    title={room.last ? `${room.last.name}: ${room.last.text}` : 'No messages yet'}
+                  >
+                    <Avatar names={room.people} size='medium' online={live} />
+                    <span className='room-name'>{roomLabel(room)}</span>
+                    <span className={'room-meta' + (live ? ' live' : '')}>
+                      {meta(room, open, peers)}
                     </span>
-                    <span className='room-preview'>
-                      {room.last ? `${room.last.name}: ${room.last.text}` : 'No messages yet'}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>
+
+      <div className='me-bar'>
+        <Avatar names={[name]} size='me' />
+        <div className='who'>
+          <b>{name}</b>
+          <small role='status'>
+            <span className={'dot ' + network(online, current, status, peers).tone} />
+            {network(online, current, status, peers).label}
+          </small>
+        </div>
+        <button className='tool' onClick={openSettings} aria-label='Settings' title='Settings'>
+          <Icon name='gear' />
+        </button>
+      </div>
     </nav>
   )
+}
+
+function meta(room, open, peers) {
+  if (open && peers.length > 0) return `${peers.length + 1} here`
+  if (open) return 'only you'
+  return room.people.length ? `${room.people.length + 1} people` : 'just you'
+}
+
+function network(online, inRoom, status, peers) {
+  if (!online) return { tone: '', label: 'Offline' }
+  if (!inRoom) return { tone: 'on', label: 'Online' }
+  if (peers.length > 0) {
+    const n = peers.length
+    return { tone: 'on', label: `Online · ${n} ${n === 1 ? 'peer' : 'peers'} connected` }
+  }
+  if (status === 'alone') return { tone: 'on', label: 'Online · no peers right now' }
+  return { tone: 'busy', label: 'Online · looking for peers…' }
 }
 
 // A stable color per person, so the same name always looks the same.
@@ -133,27 +226,17 @@ function colorFor(name) {
 export function Avatar({ names, size = 'large', online }) {
   const initials = names
     .slice(0, 2)
-    .map((name) => name[0])
+    .map((person) => person[0])
     .join('')
     .toUpperCase()
   return (
     <span
       className={'avatar ' + size}
-      style={names.length === 1 ? { background: colorFor(names[0]) } : undefined}
+      style={names.length ? { background: colorFor(names[0]) } : undefined}
       aria-hidden='true'
     >
-      {initials || <Icon name='bubbles' size={size === 'large' ? 22 : 13} weight='fill' />}
+      {initials || <Icon name='bubbles' size={size === 'large' ? 22 : 14} weight='fill' />}
       {online && <span className='online' />}
     </span>
   )
-}
-
-// Like Messages: a time today, then "Yesterday", a weekday, or a date.
-function when(at) {
-  const day = (offset) => new Date(Date.now() - offset * 864e5).toDateString()
-  const then = new Date(at).toDateString()
-  if (then === day(0)) return time.format(at)
-  if (then === day(1)) return 'Yesterday'
-  if (Date.now() - at < 6 * 864e5) return weekday.format(at)
-  return date.format(at)
 }

@@ -17,7 +17,7 @@
   --field: #ffffff;
   --field-edge: rgb(0 0 0 / 0.16);
   --sheet: #f2f2f2;
-  --sidebar-solid: #e9e9e9;
+  --sidebar-solid: #f2f2f4;
   --unemphasized: rgb(0 0 0 / 0.1);
   --green: #34c759;
   --orange: #ff9500;
@@ -55,7 +55,7 @@
     --field: rgb(255 255 255 / 0.05);
     --field-edge: rgb(255 255 255 / 0.14);
     --sheet: #2c2c2e;
-    --sidebar-solid: #282828;
+    --sidebar-solid: #161618;
     --unemphasized: rgb(255 255 255 / 0.12);
     --green: #30d158;
     --orange: #ff9f0a;
@@ -69,16 +69,12 @@
   box-sizing: border-box;
 }
 
-/* Transparent so the glass behind the window shows; panes paint their own. */
+/* The window paints the sidebar color; the conversation paints its own. */
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
-  background: transparent;
-}
-
-html[data-material='none'] body {
   background: var(--sidebar-solid);
 }
 
@@ -229,52 +225,45 @@ input:focus-visible {
   grid-template-columns: 1fr;
 }
 
-/* --- sidebar: the translucent sidebar material shows through --- */
+/* --- sidebar: rooms, and who you are on the network --- */
 
 .sidebar {
+  --ring: var(--sidebar-solid);
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-html[data-material='none'] .sidebar {
   background: var(--sidebar-solid);
 }
 
-@media (prefers-reduced-transparency: reduce) {
-  .sidebar {
-    background: var(--sidebar-solid);
-  }
-}
-
-/* traffic lights, then the sidebar and compose buttons */
+/* traffic lights, then the sidebar button */
 .sidebar-top {
   display: flex;
   flex: none;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   height: 52px;
   padding: 0 10px 0 84px;
 }
 
-.search {
+/* One field that finds a room, or joins one when you paste a key. */
+.find {
   display: flex;
   flex: none;
   align-items: center;
   gap: 6px;
   height: 32px;
-  margin: 2px 12px 10px;
+  margin: 0 10px 6px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--fill);
   color: var(--secondary);
 }
 
-.search:focus-within {
+.find:focus-within {
   outline: 3.5px solid var(--focus);
 }
 
-.search input {
+.find input {
   flex: 1;
   height: auto;
   padding: 0;
@@ -283,36 +272,77 @@ html[data-material='none'] .sidebar {
   outline: none;
 }
 
+.find input:placeholder-shown {
+  text-align: center;
+}
+
+.find:has(input:placeholder-shown) {
+  justify-content: center;
+}
+
+.find:has(input:placeholder-shown) input {
+  flex: none;
+  width: 9.5em;
+}
+
+.join-key {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  margin: 0 10px 6px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--accent);
+  box-shadow: none;
+  color: #fff;
+  font-weight: 600;
+  text-align: left;
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+
+@starting-style {
+  .join-key {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.find-error {
+  margin: -2px 14px 8px;
+  color: var(--red);
+  font-size: 11px;
+}
+
+.section-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 4px 18px;
+}
+
+.section-header h2 {
+  color: var(--secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .sidebar-scroll {
   flex: 1;
   min-height: 0;
-  padding: 0 8px 12px;
+  padding: 0 8px 8px;
   overflow-y: auto;
 }
 
 .sidebar-empty {
-  padding: 12px;
+  padding: 8px 10px;
   color: var(--secondary);
-  text-align: center;
-}
-
-.rooms li {
-  position: relative;
-}
-
-/* inset hairlines between rows, hidden around the selection */
-.rooms li + li::before {
-  position: absolute;
-  top: 0;
-  right: 12px;
-  left: 66px;
-  border-top: 0.5px solid var(--separator);
-  content: '';
-}
-
-.rooms li:has(> [aria-current])::before,
-.rooms li:has(> [aria-current]) + li::before {
-  display: none;
 }
 
 .room-row {
@@ -320,76 +350,92 @@ html[data-material='none'] .sidebar {
   align-items: center;
   gap: 10px;
   width: 100%;
-  height: auto;
-  padding: 10px;
-  border-radius: 12px;
+  height: 40px;
+  margin: 1px 0;
+  padding: 0 10px;
+  border-radius: 8px;
   background: transparent;
   box-shadow: none;
   text-align: left;
 }
 
-.room-row[aria-current] {
-  background: var(--accent);
-  color: #fff;
+@media (hover: hover) and (pointer: fine) {
+  .room-row:hover {
+    background: var(--fill);
+  }
 }
 
-.inactive .room-row[aria-current] {
-  background: var(--unemphasized);
-  color: var(--label);
+.room-row[aria-current] {
+  --ring: color-mix(in srgb, var(--sidebar-solid) 80%, var(--label));
+  background: var(--fill-strong);
 }
 
 .room-row:focus-visible {
   outline-offset: -2px;
 }
 
-.room-text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.room-line {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-}
-
 .room-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.room-time,
-.room-preview {
-  color: var(--secondary);
-  font-size: 12px;
-}
-
-.room-time {
+.room-meta {
   flex: none;
-}
-
-.room-preview {
-  display: -webkit-box;
-  overflow: hidden;
-  line-height: 15px;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.room-row[aria-current] .room-time,
-.room-row[aria-current] .room-preview {
-  color: rgb(255 255 255 / 0.8);
-}
-
-.inactive .room-row[aria-current] .room-time,
-.inactive .room-row[aria-current] .room-preview {
   color: var(--secondary);
+  font-size: 11px;
+}
+
+.room-meta.live {
+  color: var(--green);
+  font-weight: 500;
+}
+
+/* you, and the state of your connection to the network */
+.me-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  margin: 8px;
+  padding: 8px 6px 8px 10px;
+  border-radius: 12px;
+  background: var(--fill);
+}
+
+.me-bar .who {
+  flex: 1;
+  min-width: 0;
+}
+
+.me-bar b {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.me-bar small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: var(--secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.me-bar .dot.on {
+  background: var(--green);
+}
+
+.me-bar .dot.busy {
+  background: var(--orange);
 }
 
 .avatar {
@@ -409,6 +455,18 @@ html[data-material='none'] .sidebar {
   font-size: 16px;
 }
 
+.avatar.medium {
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+}
+
+.avatar.me {
+  width: 34px;
+  height: 34px;
+  font-size: 13px;
+}
+
 .avatar.small {
   width: 22px;
   height: 22px;
@@ -419,9 +477,9 @@ html[data-material='none'] .sidebar {
   position: absolute;
   right: -2px;
   bottom: -2px;
-  width: 9px;
-  height: 9px;
-  border: 1.5px solid var(--content);
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--ring, var(--content));
   border-radius: 50%;
   background: var(--green);
 }

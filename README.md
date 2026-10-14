@@ -86,20 +86,20 @@ view only                                 spawns + relays              Hyperswar
 
 This is the layout of the official [hello-pear-electron](https://github.com/holepunchto/hello-pear-electron) template. All P2P code runs in a [Bare](https://github.com/holepunchto/bare) worker started through `pear-runtime`. The renderer is a sandboxed web page that only exchanges small JSON messages with it.
 
-| File                      | What it does                                                      |
-| ------------------------- | ----------------------------------------------------------------- |
-| `workers/room.js`         | The P2P logic for one room. Start here.                           |
-| `workers/main.js`         | Worker entry: one Corestore, one Hyperswarm, the IPC protocol     |
-| `renderer/src/useChat.js` | Turns worker events into UI state, merges and orders messages     |
-| `renderer/src/*.jsx`      | The screens and states                                            |
-| `electron/native.js`      | The Mac-native shell: sidebar material, menu bar, dialogs, accent |
-| `electron/`               | The template's shell, lightly adapted                             |
+| File                      | What it does                                                   |
+| ------------------------- | -------------------------------------------------------------- |
+| `workers/room.js`         | The P2P logic for one room. Start here.                        |
+| `workers/main.js`         | Worker entry: one Corestore, one Hyperswarm, the IPC protocol  |
+| `renderer/src/useChat.js` | Turns worker events into UI state, merges and orders messages  |
+| `renderer/src/*.jsx`      | The screens and states                                         |
+| `electron/native.js`      | The Mac-native shell: menu bar, dialogs, context menus, accent |
+| `electron/`               | The template's shell, lightly adapted                          |
 
 ### Looking native on macOS
 
 I followed Apple's Human Interface Guidelines (Materials, Sidebars, Toolbars, Typography, Color, Windows).
 
-- **A translucent sidebar, an opaque conversation.** The sidebar uses the standard macOS sidebar material (Electron's `vibrancy: 'sidebar'`), and the conversation paints its own background, as the HIG separates navigation from content. Other platforms get an opaque window, and with Reduce Transparency on the sidebar becomes solid.
+- **A sidebar that shows the network.** One field finds a room, or joins one when you paste a key. The room you're in shows how many people are here right now, and a bar at the bottom shows who you are and your connection: online, looking for peers, or how many peers are connected.
 - **A Mac window, not a web page.** Inset traffic lights, a draggable toolbar with the room title and status, SF Pro at the 13 pt body size, the user's accent color read from System Settings and updated live, a default button that loses its color when the window is in the background, and a selected sidebar row that turns grey the same way.
 - **Every action is in the menu bar** (Room > New Room ⌘N, Join Room… ⌘J, Copy Room Key ⇧⌘C, Remove Room…, View > Hide Sidebar ⌃⌘S), the standard Edit menu works in text fields, and right-click gives native context menus.
 - **Onboarding.** First launch shows four short cards over the blurred app, each showing one idea with a small animation: no server in the middle, a room is a key, offline is fine, then your name and Create Room or Join with Key. Replay it from Help > Show Welcome.
@@ -144,6 +144,10 @@ This is the main tradeoff of the design. A peer whose clock is wrong will sort i
 **Catch-up after reconnecting.** The hello tells me how long the other peer's copy of each log is. If that is longer than what I have read, I am behind by the difference. The banner shows "Catching up… 3 of 12 messages" while replication fetches them, then "Up to date. 12 messages synced from peers." for a few seconds. Messages that arrive live never trigger it, because the comparison is only made from a hello.
 
 <!-- TODO screenshot: the catch-up banner -->
+
+**Typing.** While you write, the app sends a small "typing" signal on the room's Protomux channel, next to the hello. It is never stored, it is refreshed every few seconds while you type, and it expires on its own, so a peer that crashes mid-sentence never stays "typing".
+
+**Seen.** "Delivered" means a peer's machine holds the message; "Seen by Alice" means Alice looked at it. Her app reports how far she has read each log, but only while its window is in front and scrolled to the bottom. The position is resent whenever peers reconnect and clamped to the real length of my log, since it comes from another machine. Read receipts can be turned off in the Room menu.
 
 **Offline.** The renderer listens to the browser's `online` and `offline` events. This only detects losing the network interface. You can keep writing while offline, and messages stay pending until a peer is reachable.
 

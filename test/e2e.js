@@ -78,6 +78,8 @@ async function main() {
   await alice.see('Hi Alice, I am here')
   await alice.hasNot('.typing-bubble')
   await bob.see('Seen by Alice')
+  await alice.see('2 here')
+  await alice.see('Online · 1 peer connected')
   await bob.shot('6-presence')
 
   bob.quit()
@@ -97,6 +99,19 @@ async function main() {
   await alice.see('Connected to Bob')
   await alice.gone('Waiting for a peer')
   await alice.shot('9-delivered-after-reconnect')
+
+  // A third person joins by pasting the key into the sidebar's search field.
+  const carol = await launch('carol', 9333)
+  await carol.click('Skip')
+  await carol.type('.ob-field input', 'Carol')
+  await carol.click('Join with Key…')
+  await carol.click('Cancel')
+  await carol.type('.find input', key)
+  await carol.click('Join room with this key')
+  await carol.see('Is anyone here?')
+  await carol.see('3 here')
+  await alice.see('Online · 2 peers connected')
+  await carol.shot('10-sidebar-join')
 }
 
 async function launch(name, port) {

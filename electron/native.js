@@ -1,22 +1,12 @@
-// Everything that makes the window feel like a Mac app: the translucent
-// sidebar material, the menu bar, native context menus and dialogs, and the
-// system accent color. Other platforms get an ordinary opaque window.
+// Everything that makes the window feel like a Mac app: inset traffic lights,
+// the menu bar, native context menus and dialogs, and the system accent color.
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell, systemPreferences } = require('electron')
 const path = require('path')
 const { isMac } = require('which-runtime')
 
-const material = isMac ? 'vibrancy' : 'none'
-
 function windowOptions() {
-  if (!isMac) return { backgroundColor: '#1e1e1e' }
-  return {
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 18, y: 18 },
-    // The standard sidebar material behind the page. The page is transparent
-    // over the sidebar and paints an opaque background everywhere else.
-    vibrancy: 'sidebar',
-    visualEffectState: 'followWindow'
-  }
+  if (!isMac) return { backgroundColor: '#161618' }
+  return { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 18, y: 18 } }
 }
 
 function attach(win) {
@@ -128,7 +118,7 @@ function setup({ version }) {
   buildMenu()
 
   ipcMain.on('ui:info', (evt) => {
-    evt.returnValue = { platform: process.platform, material, accent: accentColor() }
+    evt.returnValue = { platform: process.platform, accent: accentColor() }
   })
 
   ipcMain.on('ui:menu-state', (evt, state) => {

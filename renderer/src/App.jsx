@@ -143,9 +143,17 @@ export default function App() {
             rooms={rooms}
             current={state.key}
             onSelect={(key) => key !== state.key && chat.join(key)}
+            peers={inRoom ? state.peers : []}
+            status={state.status}
+            online={online}
+            name={name}
+            joinError={state.joinError}
             onCopy={copyKey}
             onRemove={removeRoom}
             onAdd={addRoom}
+            onJoinKey={(key) => chat.join(key, { switching: false })}
+            onRename={() => setSheet('rename')}
+            onWelcome={() => setOnboarding(true)}
             onHide={() => setSidebarOpen(false)}
           />
         )}
