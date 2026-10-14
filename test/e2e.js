@@ -3,7 +3,7 @@
 // of each P2P state to test/screenshots/.
 //
 //   npm run build:ui && node test/e2e.js
-const { spawn, execFileSync } = require('child_process')
+const { spawn } = require('child_process')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -81,6 +81,15 @@ async function main() {
   await alice.see('2 here')
   await alice.has('.me-bar .dot.on')
   await bob.shot('6-presence')
+
+  // The Network panel shows the live connection and both logs.
+  await alice.click('Show network')
+  await alice.see('Room topic')
+  await alice.see('Same network')
+  await alice.see('signed log')
+  await alice.see('all with a peer')
+  await alice.shot('6b-network')
+  await alice.click('Hide network')
 
   bob.quit()
   await alice.see('Bob left')
@@ -204,29 +213,16 @@ async function launch(name, port) {
     eval: evaluate,
     // A capture of this app window only (by its window number), so the
     // native glass is in the picture and nothing else on screen is.
+    // The window is opaque (no glass or vibrancy), so the page's own
+    // screenshot is exactly what is on screen, and works while the display
+    // sleeps.
     async shot(file) {
-      const id = windowId(child.pid)
-      const out = path.join(shots, file + '-' + name + '.png')
-      // Screenshots are a by-product; macOS refuses them while the display
-      // sleeps or the screen is locked, which should not fail the run.
-      try {
-        if (id) execFileSync('screencapture', ['-x', '-o', '-l', id, out], { stdio: 'ignore' })
-      } catch {
-        console.log(`(no screenshot for ${file}: the window could not be captured)`)
-      }
+      const { data } = await send('Page.captureScreenshot', { format: 'png' })
+      fs.writeFileSync(path.join(shots, file + '-' + name + '.png'), Buffer.from(data, 'base64'))
     }
   }
   apps.push(app)
   return app
-}
-
-// The macOS window number of the app's window, looked up by process id.
-function windowId(pid) {
-  const script = `ObjC.import('CoreGraphics')
-    const list = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo($.kCGWindowListOptionOnScreenOnly, 0)))
-    const win = list.find((w) => w.kCGWindowOwnerPID === ${pid} && w.kCGWindowLayer === 0 && w.kCGWindowBounds.Height > 100)
-    win ? String(win.kCGWindowNumber) : ''`
-  return execFileSync('osascript', ['-l', 'JavaScript', '-e', script]).toString().trim()
 }
 
 // Minimal DevTools protocol client over the WebSocket built into Node.

@@ -38,6 +38,15 @@ test('two peers find each other, chat, and see presence', async (t) => {
   t.alike(alice.events, [{ joined: 'Bob' }], 'the peer already in the room is told who joined')
   t.alike(bob.events, [{}], 'the newcomer just sees who is there')
 
+  const net = alice.room.networkStats()
+  t.is(net.announced, true, 'the room is announced on the DHT')
+  t.is(net.peers.length, 1)
+  t.is(net.peers[0].name, 'Bob')
+  t.ok(net.peers[0].sent > 0 && net.peers[0].received > 0, 'bytes moved over the connection')
+  t.ok(typeof net.peers[0].rtt === 'number', 'round-trip time is known')
+  const mine = net.logs.find((log) => log.mine)
+  t.alike([mine.length, mine.held, mine.synced], [1, 1, 1], 'my log: 1 message, held, synced')
+
   await bob.room.send('m2', 'hi Alice')
   await until(() => alice.messages.length === 2)
   t.alike(pick(alice.messages[1]), { id: 'm2', text: 'hi Alice', name: 'Bob', mine: false })

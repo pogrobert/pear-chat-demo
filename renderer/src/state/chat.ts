@@ -21,6 +21,7 @@ interface ChatActions {
   rename(name: string): void
   setTyping(on: boolean): void
   seen(): void
+  watchNetwork(on: boolean): void
   restart(): void
 }
 
@@ -86,6 +87,9 @@ export const useChat = create<ChatStore>()((set, get) => ({
     if (!document.hasFocus() || !useSaved.getState().receipts) return
     write({ type: 'seen' })
   },
+
+  // The worker sends network snapshots only while someone is looking.
+  watchNetwork: (on) => write({ type: 'network', watch: on }),
 
   restart: () => window.location.reload()
 }))

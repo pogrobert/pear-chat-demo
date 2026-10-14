@@ -132,6 +132,53 @@ module.exports = class Room extends ReadyResource {
     }
   }
 
+  // A snapshot of the room's network state for the Network panel: every
+  // connected peer and how we reach them, and every log and how much of it
+  // has been replicated.
+  networkStats() {
+    const peers = []
+    for (const [conn, peer] of this.peers) {
+      if (!peer.id) continue
+      const raw = conn.rawStream // the UDX stream underneath the encryption
+      peers.push({
+        id: peer.id,
+        name: peer.name,
+        host: raw?.remoteHost ?? null,
+        port: raw?.remotePort ?? null,
+        rtt: raw?.rtt ?? null,
+        sent: raw?.bytesTransmitted ?? 0,
+        received: raw?.bytesReceived ?? 0,
+        retransmits: raw?.retransmits ?? 0,
+        dialed: conn.isInitiator, // true if we connected to them
+        since: peer.since
+      })
+    }
+
+    const logs = []
+    for (const [id, writer] of this.writers) {
+      const mine = id === this.id
+      logs.push({
+        id,
+        mine,
+        name: mine ? this.name : (this._nameOf(id) ?? writer.name),
+        length: writer.core.length, // how long we know the log to be
+        held: writer.read, // how much of it is on this Mac
+        target: Math.max(writer.target, writer.core.length),
+        bytes: writer.core.byteLength,
+        uploaded: writer.uploaded,
+        downloaded: writer.downloaded,
+        synced: mine ? this.syncedLength : null // for my log: how much a peer holds
+      })
+    }
+
+    return { topic: b4a.toString(this.topic, 'hex'), announced: this._discovered, peers, logs }
+  }
+
+  _nameOf(id) {
+    for (const peer of this.peers.values()) if (peer.id === id) return peer.name
+    return null
+  }
+
   listReceipts() {
     return [...this.receipts].map(([id, { name, length }]) => ({ id, name, length }))
   }
@@ -234,6 +281,7 @@ module.exports = class Room extends ReadyResource {
     if (!message || !isKey(message.id) || !Array.isArray(message.writers)) return
 
     const joined = peer.id === null
+    if (joined) peer.since = Date.now()
     const renamed = !joined && peer.name !== cleanName(message.name)
     peer.id = message.id
     peer.name = cleanName(message.name)
@@ -302,8 +350,20 @@ module.exports = class Room extends ReadyResource {
 
     const mine = this.local.key && id === this.id
     const core = mine ? this.local : this._getCore({ key: b4a.from(id, 'hex') })
-    const writer = { core, read: 0, target: 0, stream: null }
+    const writer = {
+      core,
+      read: 0,
+      target: 0,
+      stream: null,
+      name: null,
+      uploaded: 0,
+      downloaded: 0
+    }
     this.writers.set(id, writer)
+
+    // Bytes this log has moved over the network, for the Network panel.
+    core.on('upload', (index, bytes) => (writer.uploaded += bytes))
+    core.on('download', (index, bytes) => (writer.downloaded += bytes))
 
     // Fetch every block in the background instead of one at a time as we read.
     if (!mine) core.download({ start: 0, end: -1 })
@@ -314,7 +374,10 @@ module.exports = class Room extends ReadyResource {
     writer.stream.on('data', (block) => {
       const seq = writer.read++
       const message = toMessage(block, id, seq, mine)
-      if (message) this.emit('message', message)
+      if (message) {
+        writer.name = message.name
+        this.emit('message', message)
+      }
       this._updateCatchup()
     })
     writer.stream.on('error', noop) // destroyed on close, or a peer wrote garbage

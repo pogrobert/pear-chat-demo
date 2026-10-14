@@ -41,14 +41,14 @@ function broadcast(channel, data) {
 
 // --- menu bar: every action in the UI is also a menu command ---
 
-let menuState = { inRoom: false, sidebar: true, receipts: true }
+let menuState = { inRoom: false, sidebar: true, receipts: true, network: false }
 
 function buildMenu() {
   const send = (action) => () => {
     const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
     if (win) win.webContents.send('ui:menu', action)
   }
-  const { inRoom, sidebar, receipts } = menuState
+  const { inRoom, sidebar, receipts, network } = menuState
 
   const template = [
     ...(isMac ? [{ role: 'appMenu' }] : []),
@@ -85,6 +85,11 @@ function buildMenu() {
           label: sidebar ? 'Hide Sidebar' : 'Show Sidebar',
           accelerator: 'Ctrl+CmdOrCtrl+S',
           click: send('toggle-sidebar')
+        },
+        {
+          label: network ? 'Hide Network' : 'Show Network',
+          accelerator: 'Alt+CmdOrCtrl+N',
+          click: send('toggle-network')
         },
         { type: 'separator' },
         ...(app.isPackaged ? [] : [{ role: 'reload' }, { role: 'toggleDevTools' }]),

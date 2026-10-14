@@ -11,7 +11,12 @@ interface Bridge {
   confirm(options: { message: string; detail: string; confirm: string }): Promise<boolean>
   popup(items: PopupItem[]): Promise<string | null>
   emoji(): void
-  setMenuState(state: { inRoom?: boolean; sidebar?: boolean; receipts?: boolean }): void
+  setMenuState(state: {
+    inRoom?: boolean
+    sidebar?: boolean
+    receipts?: boolean
+    network?: boolean
+  }): void
   onMenu(listener: (action: string) => void): () => void
   onAccent(listener: (color: string) => void): () => void
   onFocus(listener: (focused: boolean) => void): () => void

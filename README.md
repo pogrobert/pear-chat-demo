@@ -84,7 +84,7 @@ renderer (React)  <-- window.bridge -->  Electron main  <-- pipe -->  Bare worke
 view only                                 spawns + relays              Hyperswarm, Corestore, Room
 ```
 
-This is the layout of the official [hello-pear-electron](https://github.com/holepunchto/hello-pear-electron) template. All P2P code runs in a [Bare](https://github.com/holepunchto/bare) worker started through `pear-runtime`. The renderer is a sandboxed web page that only exchanges small JSON messages with it.
+This is the layout of the official [hello-pear-electron](https://github.com/holepunchto/hello-pear-electron) template, which the Pear docs describe as the same shape Keet ships. All P2P code runs in a [Bare](https://github.com/holepunchto/bare) worker started through `pear-runtime`. The renderer is a sandboxed web page that only exchanges small JSON messages with it.
 
 | File                                | What it does                                                                 |
 | ----------------------------------- | ---------------------------------------------------------------------------- |
@@ -159,6 +159,16 @@ This is the main tradeoff of the design. A peer whose clock is wrong will sort i
 **Typing.** While you write, the app sends a small "typing" signal on the room's Protomux channel, next to the hello. It is never stored, it is refreshed every few seconds while you type, and it expires on its own, so a peer that crashes mid-sentence never stays "typing".
 
 **Seen.** "Delivered" means a peer's machine holds the message; "Seen by Alice" means Alice looked at it. Her app reports how far she has read each log, but only while its window is in front and scrolled to the bottom. The position is resent whenever peers reconnect and clamped to the real length of my log, since it comes from another machine. Read receipts can be turned off in the Room menu.
+
+**The Network panel.** View > Show Network (⌥⌘N), the network button in the toolbar, or the connection line under your name opens a live view of the P2P layer, refreshed every second while it is open:
+
+- **This Mac:** whether the DHT sees you as reachable, behind a firewall (peers reach you by hole punching) or behind a strict NAT where hole punching may fail; your public address; and the room's topic and whether it is announced.
+- **Peers:** each connection and how it was made (same network, or across the internet directly), who dialed whom, round-trip time, bytes each way from the UDX transport, and a sparkline of throughput.
+- **Logs:** every signed log in the room, how much of it is on this Mac (with progress while catching up), and for your own log how much a peer holds.
+
+The worker only gathers these numbers while the panel is open. IP addresses are masked until you click Show, so screenshots of the panel don't leak anyone's location.
+
+<!-- TODO screenshot: the Network panel next to a conversation -->
 
 **Offline.** The renderer listens to the browser's `online` and `offline` events. This only detects losing the network interface. You can keep writing while offline, and messages stay pending until a peer is reachable.
 

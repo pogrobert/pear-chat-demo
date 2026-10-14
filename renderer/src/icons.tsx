@@ -11,6 +11,8 @@ import {
   MagnifyingGlassIcon,
   NotePencilIcon,
   PlusIcon,
+  ShareNetworkIcon,
+  XIcon,
   SidebarSimpleIcon,
   SmileyIcon,
   TrashIcon,
@@ -37,7 +39,9 @@ const icons = {
   bubbles: ChatsCircleIcon,
   key: KeyIcon,
   gear: GearSixIcon,
-  user: UserIcon
+  user: UserIcon,
+  network: ShareNetworkIcon,
+  close: XIcon
 }
 
 export type IconName = keyof typeof icons

@@ -18,6 +18,7 @@ interface Props {
   onHide(): void
   onRename(): void
   onWelcome(): void
+  onNetwork(): void
 }
 
 // Rooms you have been in, and at the bottom, you and your connection to the
@@ -31,7 +32,8 @@ export default function Sidebar({
   onRemove,
   onHide,
   onRename,
-  onWelcome
+  onWelcome,
+  onNetwork
 }: Props) {
   const rooms = useSaved((s) => s.rooms)
   const name = useSaved((s) => s.name)
@@ -195,10 +197,12 @@ export default function Sidebar({
         <Avatar seed={inRoom ? me : null} size='me' />
         <div className='who'>
           <b>{name}</b>
-          <small role='status'>
+          {/* the connection line opens the Network panel */}
+          <button className='net-status' onClick={onNetwork} title='Show Network'>
             <span className={'dot ' + net.tone} />
-            {net.label}
-          </small>
+            <span role='status'>{net.label}</span>
+            <Icon name='chevron' size={11} />
+          </button>
         </div>
         <button className='tool' onClick={openSettings} aria-label='Settings' title='Settings'>
           <Icon name='gear' />

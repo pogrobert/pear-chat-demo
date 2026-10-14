@@ -47,6 +47,45 @@ export interface SavedRoom {
   last?: { text: string; name: string; at: number }
 }
 
+// The Network panel's view of the swarm, sent once a second while it is open.
+export interface NetworkPeer {
+  id: string
+  name: string
+  host: string | null
+  port: number | null
+  rtt: number | null // ms
+  sent: number // bytes
+  received: number
+  retransmits: number
+  dialed: boolean // true if we connected to them
+  since: number
+}
+
+export interface NetworkLog {
+  id: string
+  mine: boolean
+  name: string | null
+  length: number // how long the log is known to be
+  held: number // how much of it is on this Mac
+  target: number
+  bytes: number
+  uploaded: number
+  downloaded: number
+  synced: number | null // my log only: how much a peer holds
+}
+
+export interface NetworkSnapshot {
+  at: number
+  dht: {
+    host: string | null
+    port: number
+    firewalled: boolean
+    randomized: boolean
+    connections: number
+  }
+  room: { topic: string; announced: boolean; peers: NetworkPeer[]; logs: NetworkLog[] } | null
+}
+
 // Events the Bare worker sends (see workers/main.js).
 export type WorkerEvent =
   | {
@@ -70,6 +109,7 @@ export type WorkerEvent =
   | { type: 'receipts'; receipts: Receipt[] }
   | { type: 'send-failed'; id: string; detail?: string }
   | { type: 'error'; detail?: string }
+  | ({ type: 'network' } & Omit<NetworkSnapshot, 'at'>)
 
 // Events that start in the UI.
 export type LocalEvent =

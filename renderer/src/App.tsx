@@ -9,6 +9,7 @@ import { NameSheet, JoinSheet } from './Sheets.tsx'
 import Icon from './icons.tsx'
 import Onboarding from './Onboarding.tsx'
 import RoomDetails from './RoomDetails.tsx'
+import NetworkPanel from './NetworkPanel.tsx'
 import type { Peer, SavedRoom, Status } from './types.ts'
 
 const bridge = window.bridge
@@ -53,12 +54,16 @@ export default function App() {
   const [onboarding, setOnboarding] = useState(!name)
   const [pending, setPending] = useState<Pending>(null) // what to do once onboarding hands over
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [networkOpen, setNetworkOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const narrow = useMedia('(max-width: 620px)')
   const online = useOnline()
   const inRoom = chat.phase === 'room'
   const current = rooms.find((room) => room.key === chat.key)
-  const showSidebar = sidebarOpen && !narrow
+  // With the Network panel open in a small window, the sidebar makes room.
+  const crowded = useMedia('(max-width: 900px)')
+  const showSidebar = sidebarOpen && !narrow && !(networkOpen && crowded)
+  const showNetwork = networkOpen && !narrow
 
   useNativeChrome()
 
@@ -133,8 +138,8 @@ export default function App() {
 
   // The menu bar drives the same actions as the buttons.
   useEffect(() => {
-    bridge.setMenuState({ inRoom, sidebar: showSidebar, receipts })
-  }, [inRoom, showSidebar, receipts])
+    bridge.setMenuState({ inRoom, sidebar: showSidebar, receipts, network: showNetwork })
+  }, [inRoom, showSidebar, receipts, showNetwork])
 
   useEffect(
     () =>
@@ -150,6 +155,7 @@ export default function App() {
         if (action === 'join-room') setSheet('join')
         if (action === 'rename') setSheet('rename')
         if (action === 'toggle-sidebar') setSidebarOpen((open) => !open)
+        if (action === 'toggle-network') setNetworkOpen((open) => !open)
         if (action === 'copy-key' && inRoom) copyKey()
         if (action === 'remove-room' && current) removeRoom(current)
       }),
@@ -159,7 +165,9 @@ export default function App() {
   return (
     <>
       <div
-        className={'app' + (showSidebar ? '' : ' sidebar-hidden')}
+        className={
+          'app' + (showSidebar ? '' : ' sidebar-hidden') + (showNetwork ? ' inspector-open' : '')
+        }
         style={{ '--sidebar-width': sidebarWidth + 'px' } as CSSProperties}
         inert={onboarding}
       >
@@ -171,6 +179,7 @@ export default function App() {
             onRemove={removeRoom}
             onRename={() => setSheet('rename')}
             onWelcome={() => setOnboarding(true)}
+            onNetwork={() => setNetworkOpen((open) => !open)}
             onHide={() => setSidebarOpen(false)}
           />
         )}
@@ -191,6 +200,15 @@ export default function App() {
               <h1>{inRoom ? roomLabel(current) : 'Pear Chat'}</h1>
               {inRoom && <RoomStatus status={chat.status} peers={chat.peers} online={online} />}
             </div>
+            <button
+              className={'tool' + (showNetwork ? ' on' : '')}
+              onClick={() => setNetworkOpen((open) => !open)}
+              aria-label={showNetwork ? 'Hide network' : 'Show network'}
+              aria-pressed={showNetwork}
+              title='Network (⌥⌘N)'
+            >
+              <Icon name='network' />
+            </button>
             {inRoom && chat.key && (
               <RoomDetails
                 people={current?.people ?? []}
@@ -245,6 +263,7 @@ export default function App() {
             </Empty>
           )}
         </main>
+        {showNetwork && <NetworkPanel onClose={() => setNetworkOpen(false)} />}
         {sheet === 'rename' && (
           <NameSheet name={name} onSave={changeName} onCancel={() => setSheet(null)} />
         )}

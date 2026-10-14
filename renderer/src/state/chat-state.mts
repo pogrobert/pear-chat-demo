@@ -1,7 +1,17 @@
 // How the chat state changes in response to events: pure functions with no
 // React, Zustand or Electron in them, so they are unit tested directly
 // (test/chat-state.test.js) and the store only has to apply them.
-import type { Catchup, ChatEvent, Item, Message, Peer, Phase, Receipt, Status } from '../types.ts'
+import type {
+  Catchup,
+  ChatEvent,
+  Item,
+  Message,
+  NetworkSnapshot,
+  Peer,
+  Phase,
+  Receipt,
+  Status
+} from '../types.ts'
 
 export interface ChatState {
   phase: Phase
@@ -17,6 +27,7 @@ export interface ChatState {
   catchup: Catchup | null
   typing: string[] // names of peers typing right now
   receipts: Receipt[] // how far each peer has read my log
+  network: NetworkSnapshot | null // only while the Network panel is open
 }
 
 export const initialChatState: ChatState = {
@@ -32,7 +43,8 @@ export const initialChatState: ChatState = {
   syncedLength: 0,
   catchup: null,
   typing: [],
-  receipts: []
+  receipts: [],
+  network: null
 }
 
 export function reduce(state: ChatState, event: ChatEvent): ChatState {
@@ -92,6 +104,8 @@ export function reduce(state: ChatState, event: ChatEvent): ChatState {
       return { ...state, typing: event.names }
     case 'receipts':
       return { ...state, receipts: event.receipts }
+    case 'network':
+      return { ...state, network: { at: Date.now(), dht: event.dht, room: event.room } }
     case 'worker-exit':
     case 'error':
       return { ...state, phase: 'crashed' }

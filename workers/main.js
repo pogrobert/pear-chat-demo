@@ -57,6 +57,7 @@ async function applyUpdate() {
 // gets back the events below. Updater messages stay plain strings.
 
 let room = null
+let watching = null // interval sending network snapshots while the panel is open
 let queue = [] // messages are batched so loading history is not one IPC call each
 let flushing = null
 let busy = Promise.resolve() // joins and leaves run one at a time
@@ -138,7 +139,8 @@ pipe.on('data', (data) => {
     return
   }
 
-  if (message.type === 'join') busy = busy.then(() => join(message)).catch(onerror)
+  if (message.type === 'network') watchNetwork(message.watch === true)
+  else if (message.type === 'join') busy = busy.then(() => join(message)).catch(onerror)
   else if (message.type === 'leave') busy = busy.then(leave).catch(onerror)
   else if (!room) return
   else if (message.type === 'name') room.setName(message.name)
@@ -151,6 +153,29 @@ pipe.on('data', (data) => {
   }
 })
 
+// While the Network panel is open, send it a snapshot every second: this
+// Mac's place on the DHT, and the room's peers and logs.
+function watchNetwork(on) {
+  clearInterval(watching)
+  watching = null
+  if (!on) return
+  const tick = () => {
+    const dht = swarm.dht
+    emit('network', {
+      dht: {
+        host: dht.host,
+        port: dht.port,
+        firewalled: dht.firewalled,
+        randomized: dht.randomized,
+        connections: swarm.connections.size
+      },
+      room: room ? room.networkStats() : null
+    })
+  }
+  tick()
+  watching = setInterval(tick, 1000)
+}
+
 function onerror(err) {
   console.error(err)
   emit('error', { detail: err.message })
@@ -159,6 +184,7 @@ function onerror(err) {
 function noop() {}
 
 goodbye(async () => {
+  clearInterval(watching)
   // Swarm first: destroying it un-announces us and only then drops connections.
   // Closing the room first would tell peers we left while we still replicate.
   await swarm.destroy()
