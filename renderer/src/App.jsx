@@ -7,7 +7,7 @@ import Sidebar from './Sidebar.jsx'
 import Conversation, { Empty } from './Conversation.jsx'
 import { NameSheet, JoinSheet } from './Sheets.jsx'
 import Icon from './icons.jsx'
-import RoomHeader from './RoomHeader.jsx'
+import RoomDetails from './RoomDetails.jsx'
 
 const bridge = window.bridge
 
@@ -117,35 +117,29 @@ export default function App() {
           onSelect={(key) => key !== state.key && chat.join(key)}
           onCopy={copyKey}
           onRemove={removeRoom}
+          onAdd={addRoom}
           onHide={() => setSidebarOpen(false)}
         />
       )}
 
       <main className='content'>
         <header className='toolbar drag'>
-          <div className='toolbar-side'>
-            {!showSidebar && !narrow && (
-              <button
-                className='glass-button'
-                onClick={() => setSidebarOpen(true)}
-                aria-label='Show sidebar'
-                title='Show Sidebar'
-              >
-                <Icon name='sidebar' />
-              </button>
-            )}
+          {!showSidebar && !narrow && (
             <button
-              className='glass-button'
-              onClick={addRoom}
-              aria-label='New room'
-              title='New Room or Join Room'
+              className='tool'
+              onClick={() => setSidebarOpen(true)}
+              aria-label='Show sidebar'
+              title='Show Sidebar'
             >
-              <Icon name='compose' />
+              <Icon name='sidebar' />
             </button>
+          )}
+          <div className='title'>
+            <h1>{inRoom ? roomLabel(current) : 'Pear Chat'}</h1>
+            {inRoom && <Status status={state.status} peers={state.peers} online={online} />}
           </div>
           {inRoom && (
-            <RoomHeader
-              label={roomLabel(current)}
+            <RoomDetails
               people={current?.people || []}
               peers={state.peers}
               name={name}
@@ -155,9 +149,6 @@ export default function App() {
               onRemove={() => current && removeRoom(current)}
             />
           )}
-          <div className='toolbar-side end'>
-            {inRoom && <Status status={state.status} peers={state.peers} online={online} />}
-          </div>
           <span className='sr-only' role='status'>
             {copied ? 'Room key copied' : ''}
           </span>
@@ -230,7 +221,7 @@ function Status({ status, peers, online }) {
         ? { tone: 'idle', label: 'No one else is here' }
         : { tone: 'busy', label: 'Looking for peers…' }
   return (
-    <p className={'status-pill ' + tone} role='status'>
+    <p className={'subtitle ' + tone} role='status'>
       <span className='dot' aria-hidden='true' />
       {label}
     </p>

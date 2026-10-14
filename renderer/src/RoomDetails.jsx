@@ -3,18 +3,9 @@ import Icon from './icons.jsx'
 import { Avatar } from './Sidebar.jsx'
 import { usePresence } from './usePresence.js'
 
-// The centered pill in the toolbar, like the contact pill in Messages.
-// Clicking it shows who is here and the room key.
-export default function RoomHeader({
-  label,
-  people,
-  peers,
-  name,
-  roomKey,
-  copied,
-  onCopy,
-  onRemove
-}) {
+// The info button at the trailing end of the toolbar, as in Messages: who is
+// in the room, who is here now, and the room key.
+export default function RoomDetails({ people, peers, name, roomKey, copied, onCopy, onRemove }) {
   const [open, setOpen] = useState(false)
   const [mounted, state] = usePresence(open, 160)
   const pill = useRef(null)
@@ -43,25 +34,17 @@ export default function RoomHeader({
   useEffect(() => setOpen(false), [roomKey])
 
   return (
-    <div className='room-header'>
+    <div className='room-details'>
       <button
         ref={pill}
-        className='glass-pill'
+        className='tool'
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup='dialog'
-        title='Room Details'
+        aria-label='Room details'
+        title='Details'
       >
-        <span className='avatar-stack'>
-          {(people.length ? people.slice(0, 3) : ['']).map((person, index) => (
-            <Avatar key={person + index} names={person ? [person] : []} size='small' />
-          ))}
-        </span>
-        <span className='glass-pill-text'>
-          <span className='glass-pill-label'>{label}</span>
-          <span className='glass-pill-meta'>{presence(people, peers)}</span>
-        </span>
-        <Icon name='chevron' size={12} />
+        <Icon name='info' />
       </button>
 
       {mounted && (
@@ -72,7 +55,7 @@ export default function RoomHeader({
           role='dialog'
           aria-label='Room details'
         >
-          <h2>Here Now</h2>
+          <h2>{presence(people, peers)}</h2>
           <ul className='people'>
             <li>
               <Avatar names={[name]} size='small' online />

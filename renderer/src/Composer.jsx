@@ -51,6 +51,15 @@ export default function Composer({ onSend, roomKey }) {
           placeholder='Message'
           aria-label='Message'
         />
+        <button
+          type='button'
+          className='tool small'
+          onClick={openEmoji}
+          aria-label='Emoji and symbols'
+          title='Emoji & Symbols'
+        >
+          <Icon name='smile' />
+        </button>
         {/* The arrow appears once there is something to send, as in Messages. */}
         <button
           className='send'
@@ -60,18 +69,9 @@ export default function Composer({ onSend, roomKey }) {
           aria-label='Send'
           title='Send'
         >
-          <Icon name='send' size={14} />
+          <Icon name='send' size={15} weight='bold' />
         </button>
       </div>
-      <button
-        type='button'
-        className='glass-button'
-        onClick={openEmoji}
-        aria-label='Emoji and symbols'
-        title='Emoji & Symbols'
-      >
-        <Icon name='smile' />
-      </button>
     </form>
   )
 }

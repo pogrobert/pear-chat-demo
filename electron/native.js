@@ -1,48 +1,25 @@
-// Everything that makes the window feel like a Mac app: Liquid Glass behind
-// the sidebar, the menu bar, native context menus and dialogs, and the system
-// accent color. Other platforms get an ordinary opaque window.
+// Everything that makes the window feel like a Mac app: the translucent
+// sidebar material, the menu bar, native context menus and dialogs, and the
+// system accent color. Other platforms get an ordinary opaque window.
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell, systemPreferences } = require('electron')
 const path = require('path')
 const { isMac } = require('which-runtime')
 
-// Apple's glass view (NSGlassEffectView) through electron-liquid-glass. It is a
-// private API, so if it is missing we fall back to the public vibrancy effect.
-let liquidGlass = null
-if (isMac) {
-  try {
-    liquidGlass = require('electron-liquid-glass')
-  } catch (err) {
-    console.error('electron-liquid-glass unavailable:', err.message)
-  }
-}
-
-const material = !isMac
-  ? 'none'
-  : liquidGlass && liquidGlass.isGlassSupported()
-    ? 'glass'
-    : 'vibrancy'
+const material = isMac ? 'vibrancy' : 'none'
 
 function windowOptions() {
   if (!isMac) return { backgroundColor: '#1e1e1e' }
   return {
     titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 20, y: 20 },
-    // The page is transparent where the glass should show (sidebar, toolbar)
-    // and paints its own opaque background everywhere else.
-    ...(material === 'glass' ? { transparent: true } : { vibrancy: 'sidebar' })
+    trafficLightPosition: { x: 18, y: 18 },
+    // The standard sidebar material behind the page. The page is transparent
+    // over the sidebar and paints an opaque background everywhere else.
+    vibrancy: 'sidebar',
+    visualEffectState: 'followWindow'
   }
 }
 
 function attach(win) {
-  if (material === 'glass') {
-    // The glass view sits behind the web contents. Re-adding it replaces the
-    // previous one, so this is safe on every reload.
-    win.webContents.on('did-finish-load', () => {
-      // A light tint lifts the glass to the grey of Apple's own sidebars.
-      liquidGlass.addView(win.getNativeWindowHandle(), { tintColor: '#ffffff12' })
-    })
-  }
-
   // Chromium shows no context menu by default; give text the standard one.
   win.webContents.on('context-menu', (evt, params) => {
     const items = params.isEditable
@@ -123,6 +100,8 @@ function buildMenu() {
     {
       role: 'help',
       submenu: [
+        { label: 'Show Welcome', click: send('welcome') },
+        { type: 'separator' },
         { label: 'Pear Documentation', click: () => shell.openExternal('https://docs.pears.com') }
       ]
     }

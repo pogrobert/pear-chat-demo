@@ -11,7 +11,7 @@ const date = new Intl.DateTimeFormat(undefined, {
   year: '2-digit'
 })
 
-export default function Sidebar({ rooms, current, onSelect, onCopy, onRemove, onHide }) {
+export default function Sidebar({ rooms, current, onSelect, onCopy, onRemove, onAdd, onHide }) {
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
   const shown = q
@@ -46,18 +46,21 @@ export default function Sidebar({ rooms, current, onSelect, onCopy, onRemove, on
   return (
     <nav className='sidebar' aria-label='Rooms'>
       <div className='sidebar-top drag'>
-        <button
-          className='glass-button'
-          onClick={onHide}
-          aria-label='Hide sidebar'
-          title='Hide Sidebar'
-        >
+        <button className='tool' onClick={onHide} aria-label='Hide sidebar' title='Hide Sidebar'>
           <Icon name='sidebar' />
+        </button>
+        <button
+          className='tool'
+          onClick={onAdd}
+          aria-label='New room'
+          title='New Room or Join Room'
+        >
+          <Icon name='compose' />
         </button>
       </div>
 
       <label className='search'>
-        <Icon name='search' size={14} />
+        <Icon name='search' size={15} />
         <input
           type='search'
           value={query}
@@ -135,7 +138,7 @@ export function Avatar({ names, size = 'large', online }) {
       style={names.length === 1 ? { background: colorFor(names[0]) } : undefined}
       aria-hidden='true'
     >
-      {initials || <Icon name='bubbles' size={size === 'large' ? 20 : 12} />}
+      {initials || <Icon name='bubbles' size={size === 'large' ? 22 : 13} weight='fill' />}
       {online && <span className='online' />}
     </span>
   )

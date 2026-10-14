@@ -65,7 +65,8 @@ function Catchup({ catchup }) {
         </>
       ) : (
         <>
-          <Icon name='check' size={12} /> Up to date. {total} {noun} synced from peers.
+          <Icon name='check' size={13} weight='bold' /> Up to date. {total} {noun} synced from
+          peers.
         </>
       )}
     </div>
@@ -113,7 +114,11 @@ function EmptyRoom({ status, peers, created, online, onCopyKey }) {
 export function Empty({ title, busy, action, children }) {
   return (
     <div className='empty'>
-      {busy ? <span className='spinner' aria-hidden='true' /> : <Icon name='bubbles' size={40} />}
+      {busy ? (
+        <span className='spinner' aria-hidden='true' />
+      ) : (
+        <Icon name='bubbles' size={44} weight='light' />
+      )}
       <h2>{title}</h2>
       <p>{children}</p>
       {action}

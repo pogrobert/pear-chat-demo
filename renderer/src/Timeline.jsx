@@ -148,7 +148,7 @@ function Message({ message, first, last, enter, status, showStatus, group }) {
       </div>
       {labelled && (
         <p className={'delivery ' + status} title={info.title}>
-          {status !== 'synced' && <Icon name={info.icon} size={12} />}
+          {status !== 'synced' && <Icon name={info.icon} size={13} />}
           {info.label}
         </p>
       )}
