@@ -3,10 +3,12 @@ import Icon from './icons.jsx'
 
 const bridge = window.bridge
 
-export default function Composer({ onSend, roomKey }) {
+export default function Composer({ onSend, onTyping, roomKey }) {
   const [text, setText] = useState('')
   const input = useRef(null)
   const ready = text.trim().length > 0
+
+  const idle = useRef(null)
 
   // A new room starts with the cursor in the message field.
   useEffect(() => {
@@ -14,10 +16,26 @@ export default function Composer({ onSend, roomKey }) {
     input.current.focus()
   }, [roomKey])
 
+  // Typing stops when you send, clear the field, leave it, or pause for a while.
+  function stopTyping() {
+    clearTimeout(idle.current)
+    onTyping(false)
+  }
+
+  function noteTyping(value) {
+    if (!value.trim()) return stopTyping()
+    onTyping(true)
+    clearTimeout(idle.current)
+    idle.current = setTimeout(() => onTyping(false), 4000)
+  }
+
+  useEffect(() => stopTyping, [roomKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function submit(event) {
     event.preventDefault()
     if (!ready) return
     onSend(text.trim())
+    stopTyping()
     setText('')
     input.current.style.height = 'auto'
   }
@@ -29,6 +47,7 @@ export default function Composer({ onSend, roomKey }) {
 
   function onChange(event) {
     setText(event.target.value)
+    noteTyping(event.target.value)
     event.target.style.height = 'auto'
     event.target.style.height = Math.min(event.target.scrollHeight, 120) + 'px'
   }
@@ -47,6 +66,7 @@ export default function Composer({ onSend, roomKey }) {
           value={text}
           onChange={onChange}
           onKeyDown={onKeyDown}
+          onBlur={stopTyping}
           maxLength={4000}
           placeholder='Message'
           aria-label='Message'

@@ -100,16 +100,62 @@ test('messages reach a peer that never met their author', async (t) => {
   t.is(carol.messages[0].name, 'Alice', 'Bob passed on the log of a peer who has left')
 })
 
+test('typing is shared live and cleared when the typer leaves', async (t) => {
+  const { bootstrap } = await createTestnet(3, t.teardown)
+  const key = crypto.randomBytes(32)
+
+  const alice = await createPeer(t, bootstrap, key, 'Alice')
+  const bob = await createPeer(t, bootstrap, key, 'Bob')
+  await until(() => names(alice.room).length === 1 && names(bob.room).length === 1)
+
+  bob.room.setTyping(true)
+  await until(() => alice.typing.at(-1)?.join() === 'Bob')
+  t.pass('Alice sees Bob typing')
+
+  bob.room.setTyping(false)
+  await until(() => alice.typing.at(-1)?.length === 0)
+  t.pass('and sees him stop')
+
+  bob.room.setTyping(true)
+  await until(() => alice.typing.at(-1)?.join() === 'Bob')
+  await bob.close()
+  await until(() => alice.typing.at(-1)?.length === 0)
+  t.pass('a peer that leaves mid-sentence stops typing')
+})
+
+test('read receipts reach the author and survive a restart', async (t) => {
+  const { bootstrap } = await createTestnet(3, t.teardown)
+  const key = crypto.randomBytes(32)
+  const aliceStorage = await t.tmp()
+
+  let alice = await createPeer(t, bootstrap, key, 'Alice', aliceStorage)
+  const bob = await createPeer(t, bootstrap, key, 'Bob')
+  await alice.room.send('m1', 'one')
+  await alice.room.send('m2', 'two')
+  await until(() => bob.messages.length === 2)
+
+  t.alike(alice.room.listReceipts(), [], 'nothing is seen until the reader looks')
+  bob.room.markSeen()
+  await until(() => alice.room.listReceipts()[0]?.length === 2)
+  t.is(alice.room.listReceipts()[0].name, 'Bob', 'Alice knows Bob has read both')
+
+  await alice.close()
+  alice = await createPeer(t, bootstrap, key, 'Alice', aliceStorage)
+  await until(() => alice.room.listReceipts()[0]?.length === 2)
+  t.pass('after a restart, Bob tells Alice again how far he has read')
+})
+
 async function createPeer(t, bootstrap, key, name, storage) {
   const store = new Corestore(storage || (await t.tmp()))
   const swarm = new Hyperswarm({ bootstrap })
   swarm.on('connection', (conn) => store.replicate(conn))
 
   const room = new Room(store, swarm, key, { name })
-  const peer = { room, store, messages: [], events: [], catchups: [], close }
+  const peer = { room, store, messages: [], events: [], catchups: [], typing: [], close }
   room.on('message', (message) => peer.messages.push(message))
   room.on('peers', (peers, event) => peer.events.push(event))
   room.on('catchup', (catchup) => peer.catchups.push(catchup))
+  room.on('typing', (names) => peer.typing.push(names))
   await room.ready()
 
   let closed = false

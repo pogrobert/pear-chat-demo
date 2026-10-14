@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer } from 'react'
+import { useCallback, useEffect, useReducer, useRef } from 'react'
 import { load, save } from './storage.js'
 
 // The renderer never touches the network. It talks to the Bare worker through
@@ -16,7 +16,9 @@ const initial = {
   peers: [],
   items: [], // messages and join/leave notices, sorted by time
   syncedLength: 0,
-  catchup: null // { remaining, total }
+  catchup: null, // { remaining, total }
+  typing: [], // names of peers typing right now
+  receipts: [] // [{ id, name, length }]: how far each peer has read my log
 }
 
 function reducer(state, event) {
@@ -33,7 +35,8 @@ function reducer(state, event) {
         created: event.created,
         status: event.status,
         peers: event.peers,
-        syncedLength: event.syncedLength
+        syncedLength: event.syncedLength,
+        receipts: event.receipts
       }
     case 'join-start':
       return { ...state, joinError: null }
@@ -68,6 +71,10 @@ function reducer(state, event) {
       }
     case 'synced':
       return { ...state, syncedLength: event.syncedLength }
+    case 'typing':
+      return { ...state, typing: event.names }
+    case 'receipts':
+      return { ...state, receipts: event.receipts }
     case 'catchup':
       return { ...state, catchup: { remaining: event.remaining, total: event.total } }
     case 'worker-exit':
@@ -159,11 +166,28 @@ export function useChat(name) {
     [name]
   )
 
+  // Typing is sent when it starts, then at most once a second while it lasts
+  // (the worker throttles further), and once when it stops.
+  const typingSent = useRef({ on: false, at: 0 })
+  const typing = useCallback((on) => {
+    const last = typingSent.current
+    if (on === last.on && (!on || Date.now() - last.at < 1000)) return
+    typingSent.current = { on, at: Date.now() }
+    write({ type: 'typing', typing: on })
+  }, [])
+
+  // "I have looked at everything up to here." Only while the window is in front,
+  // and only if the person has not turned read receipts off.
+  const seen = useCallback(() => {
+    if (!document.hasFocus() || load('receipts') === 'off') return
+    write({ type: 'seen' })
+  }, [])
+
   const leave = useCallback(() => write({ type: 'leave' }), [])
   const rename = useCallback((next) => write({ type: 'name', name: next }), [])
   const restart = useCallback(() => window.location.reload(), [])
 
-  return { state, join, send, leave, rename, restart }
+  return { state, join, send, leave, rename, restart, typing, seen }
 }
 
 // A message of mine is synced once its position in my log is below the length

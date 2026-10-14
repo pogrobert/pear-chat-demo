@@ -19,6 +19,7 @@ export default function App() {
   const [pending, setPending] = useState(null) // what to do once onboarding hands over
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [receipts, setReceipts] = useState(() => load('receipts') !== 'off')
   const narrow = useMedia('(max-width: 620px)')
   const online = useOnline()
   const chat = useChat(name)
@@ -109,13 +110,20 @@ export default function App() {
 
   // The menu bar drives the same actions as the buttons.
   useEffect(() => {
-    bridge.setMenuState({ inRoom, sidebar: showSidebar })
-  }, [inRoom, showSidebar])
+    bridge.setMenuState({ inRoom, sidebar: showSidebar, receipts })
+  }, [inRoom, showSidebar, receipts])
 
   useEffect(
     () =>
       bridge.onMenu((action) => {
         if (action === 'welcome') setOnboarding(true)
+        if (action === 'toggle-receipts') {
+          setReceipts((on) => {
+            save('receipts', on ? 'off' : 'on')
+            if (!on) setTimeout(chat.seen) // turning them on reports what you've read
+            return !on
+          })
+        }
         if (!name) return
         if (action === 'new-room') chat.join(null)
         if (action === 'join-room') setSheet('join')
@@ -192,6 +200,8 @@ export default function App() {
               people={current?.people}
               online={online}
               onSend={chat.send}
+              onTyping={chat.typing}
+              onSeen={chat.seen}
               onCopyKey={() => copyKey()}
             />
           ) : state.phase === 'joining' ? (

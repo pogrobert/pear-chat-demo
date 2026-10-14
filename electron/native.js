@@ -51,14 +51,14 @@ function broadcast(channel, data) {
 
 // --- menu bar: every action in the UI is also a menu command ---
 
-let menuState = { inRoom: false, sidebar: true }
+let menuState = { inRoom: false, sidebar: true, receipts: true }
 
 function buildMenu() {
   const send = (action) => () => {
     const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
     if (win) win.webContents.send('ui:menu', action)
   }
-  const { inRoom, sidebar } = menuState
+  const { inRoom, sidebar, receipts } = menuState
 
   const template = [
     ...(isMac ? [{ role: 'appMenu' }] : []),
@@ -77,6 +77,12 @@ function buildMenu() {
         { label: 'Remove Room…', enabled: inRoom, click: send('remove-room') },
         { type: 'separator' },
         { label: 'Change Display Name…', click: send('rename') },
+        {
+          label: 'Send Read Receipts',
+          type: 'checkbox',
+          checked: receipts,
+          click: send('toggle-receipts')
+        },
         { type: 'separator' },
         { role: 'close' }
       ]

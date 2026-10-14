@@ -66,13 +66,18 @@ async function main() {
   await bob.see('Connected to Alice')
   await alice.see('Connected to Bob')
   await alice.see('Bob joined')
-  await alice.see('Delivered')
+  await alice.see('Seen by Bob')
   await alice.gone('Waiting for a peer')
-  await alice.shot('5-message-delivered')
+  await alice.shot('5-message-seen')
 
-  await bob.send('Hi Alice, I am here')
+  await bob.type('textarea', 'Hi Alice, I am')
+  await alice.has('.typing-bubble[aria-label="Bob is typing"]')
+  await alice.shot('6-typing')
+  await bob.type('textarea', 'Hi Alice, I am here')
+  await bob.click('Send')
   await alice.see('Hi Alice, I am here')
-  await bob.see('Delivered')
+  await alice.hasNot('.typing-bubble')
+  await bob.see('Seen by Alice')
   await bob.shot('6-presence')
 
   bob.quit()
@@ -106,6 +111,9 @@ async function launch(name, port) {
     return targets.find((target) => target.type === 'page') || Promise.reject(new Error('no page'))
   })
   const send = await connect(page.webSocketDebuggerUrl)
+  // Both windows count as in front, so read receipts behave as if a person
+  // were looking at each of them.
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true })
   const evaluate = async (expression) => {
     const { result, exceptionDetails } = await send('Runtime.evaluate', {
       expression,
@@ -127,6 +135,22 @@ async function launch(name, port) {
         if (!(await body()).includes(text)) throw new Error(`${name} never showed "${text}"`)
       })
       console.log(`ok - ${name} sees "${text}"`)
+    },
+    async has(selector) {
+      await retry(async () => {
+        if (!(await evaluate(`!!document.querySelector(${JSON.stringify(selector)})`))) {
+          throw new Error(`${name} never showed ${selector}`)
+        }
+      })
+      console.log(`ok - ${name} shows ${selector}`)
+    },
+    async hasNot(selector) {
+      await retry(async () => {
+        if (await evaluate(`!!document.querySelector(${JSON.stringify(selector)})`)) {
+          throw new Error(`${name} still shows ${selector}`)
+        }
+      })
+      console.log(`ok - ${name} no longer shows ${selector}`)
     },
     async gone(text) {
       await retry(async () => {

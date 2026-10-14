@@ -91,6 +91,8 @@ async function join(message) {
   next.on('peers', (peers, event) => emit('peers', { peers, ...event }))
   next.on('synced', (syncedLength) => emit('synced', { syncedLength }))
   next.on('catchup', (catchup) => emit('catchup', catchup))
+  next.on('typing', (names) => emit('typing', { names }))
+  next.on('receipts', (receipts) => emit('receipts', { receipts }))
 
   try {
     await next.ready()
@@ -105,7 +107,8 @@ async function join(message) {
     created: !message.key,
     status: room.status,
     peers: room.listPeers(),
-    syncedLength: room.syncedLength
+    syncedLength: room.syncedLength,
+    receipts: room.listReceipts()
   })
   flush()
 }
@@ -138,6 +141,8 @@ pipe.on('data', (data) => {
   else if (message.type === 'leave') busy = busy.then(leave).catch(onerror)
   else if (!room) return
   else if (message.type === 'name') room.setName(message.name)
+  else if (message.type === 'typing') room.setTyping(message.typing === true)
+  else if (message.type === 'seen') room.markSeen()
   else if (message.type === 'send') {
     room.send(message.id, message.text).catch((err) => {
       emit('send-failed', { id: message.id, detail: err.message })

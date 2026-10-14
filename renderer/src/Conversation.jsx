@@ -5,7 +5,15 @@ import Composer from './Composer.jsx'
 import Icon from './icons.jsx'
 import { usePresence } from './usePresence.js'
 
-export default function Conversation({ state, people = [], online, onSend, onCopyKey }) {
+export default function Conversation({
+  state,
+  people = [],
+  online,
+  onSend,
+  onTyping,
+  onSeen,
+  onCopyKey
+}) {
   const { status, peers, items, syncedLength, catchup, created, key } = state
   const waiting = items.filter((item) => statusOf(item, syncedLength) === 'pending').length
 
@@ -17,6 +25,9 @@ export default function Conversation({ state, people = [], online, onSend, onCop
         group={people.length > 1}
         items={items}
         syncedLength={syncedLength}
+        receipts={state.receipts}
+        typing={state.typing}
+        onSeen={onSeen}
         empty={
           <EmptyRoom
             status={status}
@@ -33,7 +44,7 @@ export default function Conversation({ state, people = [], online, onSend, onCop
           here.
         </p>
       )}
-      <Composer onSend={onSend} roomKey={key} />
+      <Composer onSend={onSend} onTyping={onTyping} roomKey={key} />
     </>
   )
 }

@@ -8,6 +8,8 @@ const PROTOCOL = 'pear-chat-demo/room'
 const MAX_NAME = 40
 const MAX_TEXT = 4000
 const MAX_WRITERS = 256
+const TYPING_REFRESH = 3000 // resend "typing" this often while it lasts
+const TYPING_EXPIRY = 6000 // and forget it if no refresh arrives
 
 // One chat room.
 //
@@ -16,7 +18,11 @@ const MAX_WRITERS = 256
 // Peers tell each other which logs exist in a small "hello" message, Corestore
 // replicates them, and the UI merges them by timestamp.
 //
-// Events: 'status', 'peers', 'message', 'synced', 'catchup'
+// Besides the logs, peers exchange two kinds of short-lived signals on the
+// same channel as the hello: "typing" (never stored, expires on its own) and
+// "seen" (how far each person has read every log, for read receipts).
+//
+// Events: 'status', 'peers', 'message', 'synced', 'catchup', 'typing', 'receipts'
 module.exports = class Room extends ReadyResource {
   constructor(store, swarm, key, opts = {}) {
     super()
@@ -36,6 +42,12 @@ module.exports = class Room extends ReadyResource {
     this.peers = new Map() // connection -> { channel, hello, id, name, wasHere }
     this.status = 'starting' // -> 'discovering' -> 'alone' | 'connected'
     this.catchup = { remaining: 0, total: 0 }
+
+    this.seen = {} // how far I have read each other writer's log
+    this.receipts = new Map() // peer id -> { name, length } of MY log they have read
+    this._typing = false
+    this._typingSentAt = 0
+    this._typingNames = ''
 
     this._discovered = false
     this._lastAt = 0
@@ -97,6 +109,33 @@ module.exports = class Room extends ReadyResource {
     this._broadcastHello()
   }
 
+  // Ephemeral: sent to whoever is connected right now and never written down.
+  setTyping(typing) {
+    const now = Date.now()
+    if (typing === this._typing && (!typing || now - this._typingSentAt < TYPING_REFRESH)) return
+    this._typing = typing
+    this._typingSentAt = now
+    for (const peer of this.peers.values()) {
+      if (peer.channel.opened) peer.typingMessage.send({ typing })
+    }
+  }
+
+  // The UI calls this when the person has actually looked at everything loaded
+  // so far. Peers learn how far I have read each of their logs.
+  markSeen() {
+    const seen = {}
+    for (const [id, writer] of this.writers) if (id !== this.id) seen[id] = writer.read
+    if (JSON.stringify(seen) === JSON.stringify(this.seen)) return
+    this.seen = seen
+    for (const peer of this.peers.values()) {
+      if (peer.channel.opened) peer.seenMessage.send({ seen })
+    }
+  }
+
+  listReceipts() {
+    return [...this.receipts].map(([id, { name, length }]) => ({ id, name, length }))
+  }
+
   listPeers() {
     const peers = []
     for (const peer of this.peers.values()) {
@@ -146,10 +185,18 @@ module.exports = class Room extends ReadyResource {
 
     // Peers we connect to during our own first discovery were here before us,
     // so they are listed without a "joined" notice.
-    const peer = { channel, hello: null, id: null, name: null, wasHere: !this._discovered }
+    const peer = { channel, id: null, name: null, wasHere: !this._discovered, typing: false }
     peer.hello = channel.addMessage({
       encoding: c.json,
       onmessage: (message) => this._onhello(peer, message)
+    })
+    peer.typingMessage = channel.addMessage({
+      encoding: c.json,
+      onmessage: (message) => this._ontyping(peer, message)
+    })
+    peer.seenMessage = channel.addMessage({
+      encoding: c.json,
+      onmessage: (message) => this._onseen(peer, message)
     })
     this.peers.set(conn, peer)
     channel.open()
@@ -159,6 +206,9 @@ module.exports = class Room extends ReadyResource {
     const peer = this.peers.get(conn)
     this.peers.delete(conn)
     if (!peer || !peer.id || this.closing) return
+    clearTimeout(peer.typingTimer)
+    peer.typing = false
+    this._emitTyping()
     this.emit('peers', this.listPeers(), { left: peer.name })
     this._setStatus()
   }
@@ -168,6 +218,9 @@ module.exports = class Room extends ReadyResource {
     const writers = []
     for (const [id, writer] of this.writers) writers.push({ id, length: writer.read })
     peer.hello.send({ id: this.id, name: this.name, writers })
+    // Read positions survive reconnects: send them again to every new peer.
+    if (Object.keys(this.seen).length) peer.seenMessage.send({ seen: this.seen })
+    if (this._typing) peer.typingMessage.send({ typing: true })
   }
 
   _broadcastHello() {
@@ -197,11 +250,49 @@ module.exports = class Room extends ReadyResource {
     // Pass on logs this peer just taught us, so writers reach peers who were
     // never online at the same time as them.
     if (learned) this._broadcastHello()
+    const receipt = this.receipts.get(peer.id)
+    if (receipt && receipt.name !== peer.name) {
+      receipt.name = peer.name
+      this.emit('receipts', this.listReceipts())
+    }
+
     if (joined || renamed) {
       this.emit('peers', this.listPeers(), joined && !peer.wasHere ? { joined: peer.name } : {})
     }
     this._setStatus()
     this._updateCatchup()
+  }
+
+  _ontyping(peer, message) {
+    if (!peer.id || typeof message?.typing !== 'boolean') return
+    clearTimeout(peer.typingTimer)
+    peer.typing = message.typing
+    // A peer that crashes mid-sentence never says it stopped, so it expires.
+    if (peer.typing) {
+      peer.typingTimer = setTimeout(() => {
+        peer.typing = false
+        this._emitTyping()
+      }, TYPING_EXPIRY)
+    }
+    this._emitTyping()
+  }
+
+  _emitTyping() {
+    const names = [...this.peers.values()].filter((p) => p.typing).map((p) => p.name)
+    if (names.join('\n') === this._typingNames) return
+    this._typingNames = names.join('\n')
+    this.emit('typing', names)
+  }
+
+  // How far this peer has read MY log. Untrusted, so clamped to its real length.
+  _onseen(peer, message) {
+    const length = message?.seen?.[this.id]
+    if (!peer.id || !Number.isInteger(length) || length < 0) return
+    const read = Math.min(length, this.local.length)
+    const previous = this.receipts.get(peer.id)
+    if (previous && previous.length >= read) return
+    this.receipts.set(peer.id, { name: peer.name, length: read })
+    this.emit('receipts', this.listReceipts())
   }
 
   // --- reading the logs ---

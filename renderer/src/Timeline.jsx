@@ -25,7 +25,16 @@ const delivery = {
   failed: { icon: 'alert', label: 'Not Delivered', title: 'Could not save this message.' }
 }
 
-export default function Timeline({ roomKey, items, syncedLength, group, empty }) {
+export default function Timeline({
+  roomKey,
+  items,
+  syncedLength,
+  receipts,
+  typing,
+  group,
+  onSeen,
+  empty
+}) {
   const list = useRef(null)
   const atBottom = useRef(true)
   const [unseen, setUnseen] = useState(false)
@@ -47,16 +56,29 @@ export default function Timeline({ roomKey, items, syncedLength, group, empty })
     return fresh
   }
 
-  // Follow new messages only if the reader is already at the bottom.
+  // Follow new messages only if the reader is already at the bottom. Being at
+  // the bottom also means they have seen everything, which is what read
+  // receipts report.
   useEffect(() => {
-    if (atBottom.current) list.current.scrollTop = list.current.scrollHeight
-    else setUnseen(true)
-  }, [items])
+    if (atBottom.current) {
+      list.current.scrollTop = list.current.scrollHeight
+      onSeen()
+    } else setUnseen(true)
+  }, [items, typing, onSeen])
+
+  // Coming back to the window counts as seeing what arrived meanwhile.
+  useEffect(() => {
+    const onFocus = () => atBottom.current && onSeen()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [onSeen])
 
   function onScroll() {
     const el = list.current
+    const was = atBottom.current
     atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40
     if (atBottom.current) setUnseen(false)
+    if (atBottom.current && !was) onSeen()
   }
 
   const messages = items.filter((item) => item.kind !== 'notice')
@@ -72,7 +94,7 @@ export default function Timeline({ roomKey, items, syncedLength, group, empty })
         aria-label='Messages'
         tabIndex={0}
       >
-        {messages.length === 0
+        {messages.length === 0 && !typing.length
           ? empty
           : items.map((item, index) => {
               const previous = items[index - 1]
@@ -100,11 +122,13 @@ export default function Timeline({ roomKey, items, syncedLength, group, empty })
                     enter={enter}
                     status={statusOf(item, syncedLength)}
                     showStatus={item === lastMine}
+                    seenBy={item === lastMine ? seenBy(receipts, item) : []}
                     group={group}
                   />
                 </div>
               )
             })}
+        {typing.length > 0 && <Typing names={typing} />}
       </div>
       {unseen && (
         <button
@@ -118,8 +142,10 @@ export default function Timeline({ roomKey, items, syncedLength, group, empty })
   )
 }
 
-function Message({ message, first, last, enter, status, showStatus, group }) {
-  const info = status && delivery[status]
+function Message({ message, first, last, enter, status, showStatus, group, seenBy }) {
+  // "Seen" is stronger than "Delivered": the person, not just their Mac, has it.
+  if (status === 'synced' && seenBy.length) status = 'seen'
+  const info = status && (status === 'seen' ? seenInfo(seenBy) : delivery[status])
   // Only my latest message says where it stands (earlier pending ones are
   // just paler), unless one failed.
   const labelled = info && (showStatus || status === 'failed')
@@ -147,8 +173,8 @@ function Message({ message, first, last, enter, status, showStatus, group }) {
         </p>
       </div>
       {labelled && (
-        <p className={'delivery ' + status} title={info.title}>
-          {status !== 'synced' && <Icon name={info.icon} size={13} />}
+        <p key={info.label} className={'delivery ' + status} title={info.title}>
+          {info.icon && status !== 'synced' && <Icon name={info.icon} size={13} />}
           {info.label}
         </p>
       )}
@@ -181,4 +207,35 @@ function sameDay(a, b) {
 function sameAuthor(a, b) {
   if (!a || !b || a.kind === 'notice' || b.kind === 'notice') return false
   return a.mine === b.mine && a.writer === b.writer && a.name === b.name
+}
+
+// Everyone who has read at least up to this message.
+function seenBy(receipts, message) {
+  if (message.seq === undefined) return []
+  return receipts.filter((receipt) => receipt.length > message.seq).map((receipt) => receipt.name)
+}
+
+function seenInfo(names) {
+  const who =
+    names.length === 1
+      ? names[0]
+      : names.length === 2
+        ? `${names[0]} and ${names[1]}`
+        : `${names[0]}, ${names[1]} and ${names.length - 2} more`
+  return { label: 'Seen by ' + who, title: `${names.join(', ')} read this on their device.` }
+}
+
+// Three dots in a bubble while someone is writing. Never stored anywhere.
+function Typing({ names }) {
+  const who = names.length === 1 ? names[0] : `${names[0]} and ${names.length - 1} more`
+  return (
+    <div className='typing' role='status'>
+      <p className='author'>{who}</p>
+      <p className='bubble typing-bubble' aria-label={`${who} is typing`}>
+        <i />
+        <i />
+        <i />
+      </p>
+    </div>
+  )
 }
