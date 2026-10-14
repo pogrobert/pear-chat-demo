@@ -1,33 +1,37 @@
-import { useEffect, useState } from 'react'
-import { statusOf } from './useChat.js'
-import Timeline from './Timeline.jsx'
-import Composer from './Composer.jsx'
-import Icon from './icons.jsx'
-import { usePresence } from './usePresence.js'
+import { useEffect, useState, type ReactNode } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import Timeline from './Timeline.tsx'
+import Composer from './Composer.tsx'
+import Icon from './icons.tsx'
+import { usePresence } from './hooks.ts'
+import { useChat } from './state/chat.ts'
+import { deliveryOf } from './state/chat-state.mts'
+import type { Catchup as CatchupState, Peer, Status } from './types.ts'
 
-export default function Conversation({
-  state,
-  people = [],
-  online,
-  onSend,
-  onTyping,
-  onSeen,
-  onCopyKey
-}) {
-  const { status, peers, items, syncedLength, catchup, created, key } = state
-  const waiting = items.filter((item) => statusOf(item, syncedLength) === 'pending').length
+interface Props {
+  people: string[]
+  online: boolean
+  onCopyKey(): void
+}
+
+export default function Conversation({ people, online, onCopyKey }: Props) {
+  const { status, peers, created, catchup, waiting } = useChat(
+    useShallow((s) => ({
+      status: s.status,
+      peers: s.peers,
+      created: s.created,
+      catchup: s.catchup,
+      waiting: s.items.filter(
+        (item) => item.kind !== 'notice' && deliveryOf(item, s.syncedLength) === 'pending'
+      ).length
+    }))
+  )
 
   return (
     <>
       <Catchup catchup={catchup} />
       <Timeline
-        roomKey={key}
         group={people.length > 1}
-        items={items}
-        syncedLength={syncedLength}
-        receipts={state.receipts}
-        typing={state.typing}
-        onSeen={onSeen}
         empty={
           <EmptyRoom
             status={status}
@@ -44,14 +48,14 @@ export default function Conversation({
           here.
         </p>
       )}
-      <Composer onSend={onSend} onTyping={onTyping} roomKey={key} />
+      <Composer />
     </>
   )
 }
 
 // A capsule under the toolbar while missed messages download, then briefly
 // once they are in. It drops from the toolbar and leaves the same way.
-function Catchup({ catchup }) {
+function Catchup({ catchup }: { catchup: CatchupState | null }) {
   const [visible, setVisible] = useState(false)
   const [mounted, phase] = usePresence(visible, 250)
 
@@ -84,7 +88,15 @@ function Catchup({ catchup }) {
   )
 }
 
-function EmptyRoom({ status, peers, created, online, onCopyKey }) {
+interface EmptyRoomProps {
+  status: Status
+  peers: Peer[]
+  created: boolean
+  online: boolean
+  onCopyKey(): void
+}
+
+function EmptyRoom({ status, peers, created, online, onCopyKey }: EmptyRoomProps) {
   if (!online) {
     return (
       <Empty title='You’re Offline'>
@@ -122,7 +134,14 @@ function EmptyRoom({ status, peers, created, online, onCopyKey }) {
   )
 }
 
-export function Empty({ title, busy, action, children }) {
+interface EmptyProps {
+  title: string
+  busy?: boolean
+  action?: ReactNode
+  children: ReactNode
+}
+
+export function Empty({ title, busy, action, children }: EmptyProps) {
   return (
     <div className='empty'>
       {busy ? (

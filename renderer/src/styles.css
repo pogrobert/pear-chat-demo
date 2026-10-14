@@ -282,7 +282,9 @@ input:focus-visible {
 
 .find:has(input:placeholder-shown) input {
   flex: none;
-  width: 9.5em;
+  /* as wide as the placeholder, so it is never cut off and stays centered */
+  field-sizing: content;
+  min-width: 1ch;
 }
 
 .join-key {
@@ -444,9 +446,13 @@ input:focus-visible {
   flex: none;
   place-items: center;
   border-radius: 50%;
-  background: linear-gradient(#a9aeb9, #858a95);
-  color: #fff;
-  font-weight: 600;
+  background: var(--fill-strong);
+  color: var(--secondary);
+}
+
+.avatar svg:not(.icon) {
+  display: block;
+  border-radius: 50%;
 }
 
 .avatar.large {
@@ -698,8 +704,23 @@ button.destructive {
 
 .timeline {
   height: 100%;
-  padding: 8px 22px 12px 18px;
+  padding: 0 22px 0 18px;
   overflow-y: auto;
+}
+
+/* Virtualized rows: only those on screen are in the DOM, each absolutely
+   placed and measured. flow-root keeps a bubble's margin inside its row, so
+   the measured height is the real one. */
+.rows {
+  position: relative;
+}
+
+.row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flow-root;
+  width: 100%;
 }
 
 .timeline:focus-visible {
@@ -791,55 +812,20 @@ button.destructive {
   background: color-mix(in srgb, var(--accent) 55%, var(--content));
 }
 
-/* consecutive bubbles from one person tuck together */
+/* No drawn tail: the corner on the speaker's side is tighter at the bottom of
+   every bubble (and at the top of all but the first in a run), which reads as
+   a tail without any extra shapes. */
+.message:not(.mine) .bubble {
+  border-bottom-left-radius: 6px;
+}
 .message:not(.mine):not(.first) .bubble {
   border-top-left-radius: 6px;
 }
-.message:not(.mine):not(.last) .bubble {
-  border-bottom-left-radius: 6px;
+.message.mine .bubble {
+  border-bottom-right-radius: 6px;
 }
 .message.mine:not(.first) .bubble {
   border-top-right-radius: 6px;
-}
-.message.mine:not(.last) .bubble {
-  border-bottom-right-radius: 6px;
-}
-
-/* the tail on the last bubble of a run */
-.message.last .bubble::before,
-.message.last .bubble::after {
-  position: absolute;
-  bottom: 0;
-  height: 17px;
-  content: '';
-}
-
-.message.mine.last .bubble::before {
-  right: -7px;
-  width: 20px;
-  border-bottom-left-radius: 16px 14px;
-  background: inherit;
-}
-
-.message.mine.last .bubble::after {
-  right: -26px;
-  width: 26px;
-  border-bottom-left-radius: 10px;
-  background: var(--content);
-}
-
-.message:not(.mine).last .bubble::before {
-  left: -7px;
-  width: 20px;
-  border-bottom-right-radius: 16px 14px;
-  background: inherit;
-}
-
-.message:not(.mine).last .bubble::after {
-  left: -26px;
-  width: 26px;
-  border-bottom-right-radius: 10px;
-  background: var(--content);
 }
 
 .delivery {
@@ -880,7 +866,7 @@ button.destructive {
   text-align: center;
 }
 
-/* --- composer --- */
+/* --- composer: [emoji] [ field ] [send] --- */
 
 .composer {
   display: flex;
@@ -893,12 +879,10 @@ button.destructive {
 .composer-field {
   display: flex;
   flex: 1;
-  align-items: flex-end;
-  gap: 6px;
-  min-height: 34px;
-  padding: 4px 4px 4px 14px;
-  border-radius: 17px;
   align-items: center;
+  min-height: 34px;
+  padding: 4px 14px;
+  border-radius: 17px;
   background: var(--field);
   box-shadow: inset 0 0 0 0.5px var(--field-edge);
 }
@@ -923,31 +907,50 @@ button.destructive {
   cursor: text;
 }
 
+/* both side buttons are 34px circles, level with a one-line field */
+.composer-button,
 .send {
   display: grid;
   flex: none;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 34px;
+  height: 34px;
   padding: 0;
-  background: var(--accent);
+  border-radius: 50%;
   box-shadow: none;
-  color: #fff;
   transition:
-    opacity 150ms var(--ease-out),
-    transform 150ms var(--ease-out);
+    background-color 150ms ease,
+    color 150ms ease,
+    transform 160ms var(--ease-out);
 }
 
-/* press feedback, the instant the pointer goes down */
-.send:active {
-  transform: scale(0.96);
-  filter: none;
+.composer-button {
+  background: transparent;
+  color: var(--secondary);
 }
 
-/* hidden until there is something to send */
+@media (hover: hover) and (pointer: fine) {
+  .composer-button:hover {
+    background: var(--fill);
+    color: var(--label);
+  }
+}
+
+.send {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* nothing to send yet: same place, quiet colors */
 .send[data-ready='false'] {
-  opacity: 0;
-  transform: scale(0.9);
+  background: var(--fill-strong);
+  color: var(--tertiary);
+  opacity: 1;
+}
+
+.composer-button:active,
+.send:active:not(:disabled) {
+  transform: scale(0.94);
 }
 
 /* --- empty states --- */

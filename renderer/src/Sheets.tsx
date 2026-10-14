@@ -1,17 +1,30 @@
-import { useEffect, useRef, useState } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+  type SyntheticEvent
+} from 'react'
 
-// A Mac-style sheet: modal, drops from the top of the window, Escape cancels
-// (unless it can't be cancelled), Return confirms the default button.
-function Sheet({ title, onCancel, children }) {
-  const dialog = useRef(null)
+interface SheetProps {
+  title: string
+  onCancel(): void
+  children: ReactNode
+}
+
+// A Mac-style sheet: modal, drops from the top of the window, Escape cancels,
+// Return confirms the default button.
+function Sheet({ title, onCancel, children }: SheetProps) {
+  const dialog = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
-    dialog.current.showModal()
+    dialog.current?.showModal()
   }, [])
 
-  function cancel(event) {
+  function cancel(event: SyntheticEvent) {
     event.preventDefault()
-    if (onCancel) onCancel()
+    onCancel()
   }
 
   return (
@@ -22,26 +35,25 @@ function Sheet({ title, onCancel, children }) {
   )
 }
 
-export function NameSheet({ firstRun, name = '', onSave, onCancel }) {
+interface NameSheetProps {
+  name: string
+  onSave(name: string): void
+  onCancel(): void
+}
+
+export function NameSheet({ name, onSave, onCancel }: NameSheetProps) {
   const [value, setValue] = useState(name)
   const next = value.trim()
 
-  function submit(event) {
+  function submit(event: FormEvent) {
     event.preventDefault()
     if (next) onSave(next)
   }
 
   return (
-    <Sheet
-      title={firstRun ? 'Welcome to Pear Chat' : 'Change Display Name'}
-      onCancel={firstRun ? null : onCancel}
-    >
+    <Sheet title='Change Display Name' onCancel={onCancel}>
       <form onSubmit={submit}>
-        <p>
-          {firstRun
-            ? 'Chat directly with other people, with no server and no account. What should people call you?'
-            : 'People see this name next to your messages.'}
-        </p>
+        <p>People see this name next to your messages.</p>
         <label htmlFor='name'>Display name</label>
         <input
           id='name'
@@ -53,13 +65,11 @@ export function NameSheet({ firstRun, name = '', onSave, onCancel }) {
         />
         <p className='hint'>Stored on this Mac.</p>
         <div className='sheet-buttons'>
-          {!firstRun && (
-            <button type='button' onClick={onCancel}>
-              Cancel
-            </button>
-          )}
+          <button type='button' onClick={onCancel}>
+            Cancel
+          </button>
           <button className='default' type='submit' disabled={!next}>
-            {firstRun ? 'Continue' : 'Save'}
+            Save
           </button>
         </div>
       </form>
@@ -72,21 +82,27 @@ const errors = {
   storage: 'Couldn’t open this room’s storage on this Mac.'
 }
 
-export function JoinSheet({ error: lastError, onJoin, onCancel }) {
+interface JoinSheetProps {
+  error: keyof typeof errors | null
+  onJoin(key: string): void
+  onCancel(): void
+}
+
+export function JoinSheet({ error: lastError, onJoin, onCancel }: JoinSheetProps) {
   const [key, setKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const error = submitted ? lastError : null // ignore errors from an earlier attempt
-  const input = useRef(null)
+  const input = useRef<HTMLInputElement>(null)
 
   // Put the cursor back where the problem is.
   useEffect(() => {
     if (!error) return
     setBusy(false)
-    input.current.select()
+    input.current?.select()
   }, [error])
 
-  function submit(event) {
+  function submit(event: FormEvent) {
     event.preventDefault()
     if (!key.trim()) return
     setBusy(true)
@@ -113,7 +129,7 @@ export function JoinSheet({ error: lastError, onJoin, onCancel }) {
         />
         {error && (
           <p id='key-error' className='error' role='alert'>
-            {errors[error] || 'Couldn’t join that room. Please try again.'}
+            {errors[error]}
           </p>
         )}
         <div className='sheet-buttons'>

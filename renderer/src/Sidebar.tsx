@@ -1,33 +1,50 @@
-import { useEffect, useState } from 'react'
-import Icon from './icons.jsx'
-import { roomLabel } from './useRooms.js'
-
-const bridge = window.bridge
+import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import Icon from './icons.tsx'
+import Avatar from './Avatar.tsx'
+import { useChat } from './state/chat.ts'
+import { roomLabel, useSaved } from './state/saved.ts'
+import type { SavedRoom } from './types.ts'
 
 // A room key is 52 z-base-32 characters (or 64 hex); pear:// links work too.
 const KEY = /^(pear:\/\/)?([a-z0-9]{52}|[0-9a-f]{64})$/i
+
+interface Props {
+  online: boolean
+  onAdd(): void
+  onCopy(key: string): void
+  onRemove(room: SavedRoom): void
+  onHide(): void
+  onRename(): void
+  onWelcome(): void
+}
 
 // Rooms you have been in, and at the bottom, you and your connection to the
 // network. Live presence ("2 here") is only known for the open room, because
 // the app is connected to one room at a time; the others show how many
 // people have been in them.
 export default function Sidebar({
-  rooms,
-  current,
-  peers,
-  status,
   online,
-  name,
-  joinError,
-  onSelect,
   onAdd,
-  onJoinKey,
   onCopy,
   onRemove,
   onHide,
   onRename,
   onWelcome
-}) {
+}: Props) {
+  const rooms = useSaved((s) => s.rooms)
+  const name = useSaved((s) => s.name)
+  const { current, me, peers, joinError, inRoom } = useChat(
+    useShallow((s) => ({
+      current: s.key,
+      me: s.me,
+      peers: s.peers,
+      joinError: s.joinError,
+      inRoom: s.phase === 'room'
+    }))
+  )
+  const join = useChat((s) => s.join)
+
   const [query, setQuery] = useState('')
   const [joining, setJoining] = useState(false)
   const q = query.trim()
@@ -35,13 +52,13 @@ export default function Sidebar({
   const shown =
     q && !isKey
       ? rooms.filter((room) =>
-          (roomLabel(room) + ' ' + (room.last?.text || '')).toLowerCase().includes(q.toLowerCase())
+          (roomLabel(room) + ' ' + (room.last?.text ?? '')).toLowerCase().includes(q.toLowerCase())
         )
       : rooms
 
   function joinKey() {
     setJoining(true)
-    onJoinKey(q)
+    join(q, { switching: false })
   }
 
   // A successful join opens the room; clear the field then.
@@ -53,20 +70,24 @@ export default function Sidebar({
   }, [current])
 
   // Arrow keys move through the list, as in any Mac source list.
-  function onKeyDown(event) {
+  function onKeyDown(event: KeyboardEvent) {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
     event.preventDefault()
     const index = shown.findIndex((room) => room.key === current)
     const next = shown[index + (event.key === 'ArrowDown' ? 1 : -1)]
     if (next) {
-      onSelect(next.key)
+      select(next.key)
       document.getElementById('room-' + next.key)?.focus()
     }
   }
 
-  async function onContextMenu(event, room) {
+  function select(key: string) {
+    if (key !== current) join(key)
+  }
+
+  async function onContextMenu(event: MouseEvent, room: SavedRoom) {
     event.preventDefault()
-    const choice = await bridge.popup([
+    const choice = await window.bridge.popup([
       { id: 'copy', label: 'Copy Room Key' },
       { separator: true },
       { id: 'remove', label: 'Remove Room…' }
@@ -76,13 +97,15 @@ export default function Sidebar({
   }
 
   async function openSettings() {
-    const choice = await bridge.popup([
+    const choice = await window.bridge.popup([
       { id: 'rename', label: 'Change Display Name…' },
       { id: 'welcome', label: 'Show Welcome' }
     ])
     if (choice === 'rename') onRename()
     if (choice === 'welcome') onWelcome()
   }
+
+  const net = network(online)
 
   return (
     <nav className='sidebar' aria-label='Rooms'>
@@ -150,15 +173,13 @@ export default function Sidebar({
                     id={'room-' + room.key}
                     className='room-row'
                     aria-current={open ? 'true' : undefined}
-                    onClick={() => onSelect(room.key)}
+                    onClick={() => select(room.key)}
                     onContextMenu={(event) => onContextMenu(event, room)}
                     title={room.last ? `${room.last.name}: ${room.last.text}` : 'No messages yet'}
                   >
-                    <Avatar names={room.people} size='medium' online={live} />
+                    <Avatar seed={room.key} size='medium' online={live} />
                     <span className='room-name'>{roomLabel(room)}</span>
-                    <span className={'room-meta' + (live ? ' live' : '')}>
-                      {meta(room, open, peers)}
-                    </span>
+                    {live && <span className='room-meta live'>{peers.length + 1} here</span>}
                   </button>
                 </li>
               )
@@ -168,12 +189,12 @@ export default function Sidebar({
       </div>
 
       <div className='me-bar'>
-        <Avatar names={[name]} size='me' />
+        <Avatar seed={inRoom ? me : null} size='me' />
         <div className='who'>
           <b>{name}</b>
           <small role='status'>
-            <span className={'dot ' + network(online, current, status, peers).tone} />
-            {network(online, current, status, peers).label}
+            <span className={'dot ' + net.tone} />
+            {net.label}
           </small>
         </div>
         <button className='tool' onClick={openSettings} aria-label='Settings' title='Settings'>
@@ -184,59 +205,8 @@ export default function Sidebar({
   )
 }
 
-function meta(room, open, peers) {
-  if (open && peers.length > 0) return `${peers.length + 1} here`
-  if (open) return 'only you'
-  return room.people.length ? `${room.people.length + 1} people` : 'just you'
-}
-
-function network(online, inRoom, status, peers) {
-  if (!online) return { tone: '', label: 'Offline' }
-  if (!inRoom) return { tone: 'on', label: 'Online' }
-  if (peers.length > 0) {
-    const n = peers.length
-    return { tone: 'on', label: `Online · ${n} ${n === 1 ? 'peer' : 'peers'} connected` }
-  }
-  if (status === 'alone') return { tone: 'on', label: 'Online · no peers right now' }
-  return { tone: 'busy', label: 'Online · looking for peers…' }
-}
-
-// A stable color per person, so the same name always looks the same.
-const hues = [
-  ['#ff9f6b', '#f26b3a'],
-  ['#6fc3ff', '#2f8de4'],
-  ['#8ee28a', '#3dae50'],
-  ['#c39bff', '#8a5be0'],
-  ['#ffcf5c', '#e7a21f'],
-  ['#ff8fb4', '#e0507e'],
-  ['#6fe0d4', '#21a89a']
-]
-
-export function huesFor(name) {
-  let hash = 0
-  for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
-  return hues[hash % hues.length]
-}
-
-function colorFor(name) {
-  const [top, bottom] = huesFor(name)
-  return `linear-gradient(${top}, ${bottom})`
-}
-
-export function Avatar({ names, size = 'large', online }) {
-  const initials = names
-    .slice(0, 2)
-    .map((person) => person[0])
-    .join('')
-    .toUpperCase()
-  return (
-    <span
-      className={'avatar ' + size}
-      style={names.length ? { background: colorFor(names[0]) } : undefined}
-      aria-hidden='true'
-    >
-      {initials || <Icon name='bubbles' size={size === 'large' ? 22 : 14} weight='fill' />}
-      {online && <span className='online' />}
-    </span>
-  )
+// Only your connection to the network; how the open room is doing is shown
+// once, under its name in the toolbar.
+function network(online: boolean) {
+  return online ? { tone: 'on', label: 'Online' } : { tone: '', label: 'Offline' }
 }

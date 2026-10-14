@@ -107,6 +107,7 @@ async function join(message) {
     created: !message.key,
     status: room.status,
     peers: room.listPeers(),
+    me: room.id, // my writer key in this room: what my avatar is made from
     syncedLength: room.syncedLength,
     receipts: room.listReceipts()
   })

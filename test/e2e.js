@@ -44,7 +44,7 @@ async function main() {
   await alice.shot('1-finding-peers')
   await alice.see('Your Room Is Ready')
   await alice.shot('2-empty-room')
-  const key = await alice.eval("localStorage.getItem('room')")
+  const key = await alice.eval("JSON.parse(localStorage.getItem('pear-chat')).state.lastRoom")
 
   await alice.send('Is anyone here?')
   await alice.see('Waiting for a peer')
@@ -79,7 +79,7 @@ async function main() {
   await alice.hasNot('.typing-bubble')
   await bob.see('Seen by Alice')
   await alice.see('2 here')
-  await alice.see('Online · 1 peer connected')
+  await alice.has('.me-bar .dot.on')
   await bob.shot('6-presence')
 
   bob.quit()
@@ -110,7 +110,7 @@ async function main() {
   await carol.click('Join room with this key')
   await carol.see('Is anyone here?')
   await carol.see('3 here')
-  await alice.see('Online · 2 peers connected')
+  await alice.see('3 here')
   await carol.shot('10-sidebar-join')
 }
 

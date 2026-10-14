@@ -14,7 +14,9 @@ import {
   SidebarSimpleIcon,
   SmileyIcon,
   TrashIcon,
-  WarningCircleIcon
+  UserIcon,
+  WarningCircleIcon,
+  type IconWeight
 } from '@phosphor-icons/react'
 
 // Phosphor icons, imported one by one so the bundle only carries these.
@@ -34,10 +36,19 @@ const icons = {
   alert: WarningCircleIcon,
   bubbles: ChatsCircleIcon,
   key: KeyIcon,
-  gear: GearSixIcon
+  gear: GearSixIcon,
+  user: UserIcon
 }
 
-export default function Icon({ name, size = 18, weight = 'regular' }) {
+export type IconName = keyof typeof icons
+
+interface Props {
+  name: IconName
+  size?: number
+  weight?: IconWeight
+}
+
+export default function Icon({ name, size = 18, weight = 'regular' }: Props) {
   const Component = icons[name]
   return <Component className='icon' size={size} weight={weight} aria-hidden='true' />
 }

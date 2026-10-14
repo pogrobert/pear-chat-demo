@@ -1,13 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { CloudSlashIcon, KeyIcon, LaptopIcon, UserIcon } from '@phosphor-icons/react'
-import { Avatar, huesFor } from './Sidebar.jsx'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { CloudSlashIcon, KeyIcon, LaptopIcon } from '@phosphor-icons/react'
+import BoringAvatar from 'boring-avatars'
+import Avatar from './Avatar.tsx'
 import './onboarding.css'
+
+type Action = 'create' | 'join'
+
+// CSS custom properties (--i, --dir, …) drive the staggered animations.
+const vars = (values: Record<string, string | number>) => values as CSSProperties
 
 // First run: four cards over the (blurred) app. The first three explain the
 // three ideas that make this app different, each with a small animation that
 // shows the idea instead of describing it. The last one asks for a name and
 // ends in an action: create a room or join one.
-const steps = [
+const steps: { title: string; body: string; Art: (props: { name: string }) => ReactNode }[] = [
   {
     title: 'Nothing in the middle',
     body: 'Pear Chat sends messages straight from your Mac to theirs. No server, no account, nothing to sign up for.',
@@ -31,17 +37,22 @@ const steps = [
 ]
 const LAST = steps.length - 1
 
-export default function Onboarding({ initialName = '', onDone }) {
+interface Props {
+  initialName?: string
+  onDone(name: string, action: Action): void
+}
+
+export default function Onboarding({ initialName = '', onDone }: Props) {
   const [step, setStep] = useState(0)
-  const [previous, setPrevious] = useState(null)
+  const [previous, setPrevious] = useState<number | null>(null)
   const [direction, setDirection] = useState(1)
   const [name, setName] = useState(initialName)
   const [error, setError] = useState(false)
   const [leaving, setLeaving] = useState(false)
-  const primary = useRef(null)
-  const input = useRef(null)
+  const primary = useRef<HTMLButtonElement>(null)
+  const input = useRef<HTMLInputElement>(null)
 
-  function go(next) {
+  function go(next: number) {
     if (next === step || next < 0 || next > LAST) return
     setDirection(next > step ? 1 : -1)
     setPrevious(step)
@@ -63,8 +74,8 @@ export default function Onboarding({ initialName = '', onDone }) {
 
   // Arrow keys page through the cards, except while typing.
   useEffect(() => {
-    function onKey(event) {
-      if (event.target.tagName === 'INPUT') return
+    function onKey(event: KeyboardEvent) {
+      if ((event.target as HTMLElement).tagName === 'INPUT') return
       if (event.key === 'ArrowRight') go(step + 1)
       if (event.key === 'ArrowLeft') go(step - 1)
     }
@@ -72,11 +83,11 @@ export default function Onboarding({ initialName = '', onDone }) {
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  function finish(action) {
+  function finish(action: Action) {
     const trimmed = name.trim()
     if (!trimmed) {
       setError(true)
-      input.current.focus()
+      input.current?.focus()
       return
     }
     setLeaving(true)
@@ -165,7 +176,7 @@ export default function Onboarding({ initialName = '', onDone }) {
                 aria-current={index === step ? 'step' : undefined}
               />
             ))}
-            <span className='ob-dot-active' style={{ '--step': step }} aria-hidden='true' />
+            <span className='ob-dot-active' style={vars({ '--step': step })} aria-hidden='true' />
           </div>
         </div>
       </div>
@@ -173,25 +184,33 @@ export default function Onboarding({ initialName = '', onDone }) {
   )
 }
 
-function Step({ index, state, direction, name, children }) {
+interface StepProps {
+  index: number
+  state: 'enter' | 'exit'
+  direction: number
+  name: string
+  children?: ReactNode
+}
+
+function Step({ index, state, direction, name, children }: StepProps) {
   const { title, body, Art } = steps[index]
   const live = state === 'enter'
   return (
     <section
       className='ob-step'
       data-state={state}
-      style={{ '--dir': direction }}
+      style={vars({ '--dir': direction })}
       aria-hidden={!live}
     >
-      <div className='ob-art' style={{ '--i': 0 }}>
+      <div className='ob-art' style={vars({ '--i': 0 })}>
         <Art name={name} />
       </div>
       <div className='ob-copy'>
-        <h1 id={live ? 'ob-title' : undefined} style={{ '--i': 1 }}>
+        <h1 id={live ? 'ob-title' : undefined} style={vars({ '--i': 1 })}>
           {title}
         </h1>
-        <p style={{ '--i': 2 }}>{body}</p>
-        {children && <div style={{ '--i': 3 }}>{children}</div>}
+        <p style={vars({ '--i': 2 })}>{body}</p>
+        {children && <div style={vars({ '--i': 3 })}>{children}</div>}
       </div>
     </section>
   )
@@ -232,13 +251,13 @@ function KeyArt() {
     <div className='art-key'>
       <div className='ob-tile keycap'>
         <KeyIcon size={20} weight='duotone' />
-        <span className='mono'>{text.match(/.{1,4}/g).join(' ')} …</span>
+        <span className='mono'>{text.match(/.{1,4}/g)?.join(' ')} …</span>
         <span className='shine' />
       </div>
       <div className='joiners'>
         {['Alice', 'Joe', 'Mia'].map((person, index) => (
-          <span key={person} className='joiner' style={{ '--j': index }}>
-            <Avatar names={[person]} size='small' />
+          <span key={person} className='joiner' style={vars({ '--j': index })}>
+            <Avatar seed={person + key} size='small' />
             {person} joined
           </span>
         ))}
@@ -248,11 +267,14 @@ function KeyArt() {
 }
 
 // Characters settle left to right over about a second.
-function useScramble(target) {
+function useScramble(target: string) {
   const reduce = usePrefersReducedMotion()
   const [text, setText] = useState(reduce ? target : scramble(target, 0))
   useEffect(() => {
-    if (reduce) return setText(target)
+    if (reduce) {
+      setText(target)
+      return
+    }
     let frame = 0
     const timer = setInterval(() => {
       frame++
@@ -265,7 +287,7 @@ function useScramble(target) {
   return text
 }
 
-function scramble(target, settled) {
+function scramble(target: string, settled: number) {
   return [...target]
     .map((char, i) => (i < settled ? char : Z32[Math.floor(Math.random() * 32)]))
     .join('')
@@ -282,7 +304,7 @@ function OfflineArt() {
     <div className='ob-tile art-offline'>
       <div className='chat-head'>
         <span className={'dot' + (back ? ' on' : '')} />
-        <span key={back}>{back ? 'Mia is back online' : 'Mia is offline'}</span>
+        <span key={String(back)}>{back ? 'Mia is back online' : 'Mia is offline'}</span>
       </div>
       <p className='chat-bubble theirs'>Talk tomorrow?</p>
       <p className={'chat-bubble mine' + (back ? '' : ' pending')}>
@@ -295,31 +317,23 @@ function OfflineArt() {
   )
 }
 
-// 4. Your avatar, taking shape as you type.
-function NameArt({ name }) {
+// 4. Your avatar: drawn from a key, like everyone's, with your name under it.
+function NameArt({ name }: { name: string }) {
+  const seed = useMemo(() => crypto.randomUUID(), [])
   const trimmed = name.trim()
-  const initials = trimmed
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
-  const [top, bottom] = trimmed ? huesFor(trimmed) : ['#b9bdc7', '#8d929c']
   return (
     <div className='art-name'>
-      <div className='ob-avatar' style={{ '--top': top, '--bottom': bottom }}>
-        {initials ? (
-          <span key={initials} className='ob-initials'>
-            {initials}
-          </span>
-        ) : (
-          <UserIcon size={44} weight='fill' />
-        )}
+      <div className='ob-avatar'>
+        <BoringAvatar name={seed} variant='marble' size={104} colors={avatarPalette} />
       </div>
-      <p className='ob-avatar-name'>{trimmed || 'You'}</p>
+      <p className='ob-avatar-name' key={trimmed || 'you'}>
+        {trimmed || 'You'}
+      </p>
     </div>
   )
 }
+
+const avatarPalette = ['#0a84ff', '#5e5ce6', '#30d158', '#ff9f0a', '#ff6482']
 
 function usePrefersReducedMotion() {
   return useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, [])

@@ -1,27 +1,48 @@
 import { useEffect, useRef, useState } from 'react'
-import Icon from './icons.jsx'
-import { Avatar } from './Sidebar.jsx'
-import { usePresence } from './usePresence.js'
+import Icon from './icons.tsx'
+import Avatar from './Avatar.tsx'
+import { usePresence } from './hooks.ts'
+import type { Peer } from './types.ts'
+
+interface Props {
+  people: string[]
+  peers: Peer[]
+  name: string
+  me: string | null
+  roomKey: string
+  copied: boolean
+  onCopy(): void
+  onRemove(): void
+}
 
 // The info button at the trailing end of the toolbar, as in Messages: who is
 // in the room, who is here now, and the room key.
-export default function RoomDetails({ people, peers, name, roomKey, copied, onCopy, onRemove }) {
+export default function RoomDetails({
+  people,
+  peers,
+  name,
+  me,
+  roomKey,
+  copied,
+  onCopy,
+  onRemove
+}: Props) {
   const [open, setOpen] = useState(false)
   const [mounted, state] = usePresence(open, 160)
-  const pill = useRef(null)
-  const panel = useRef(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     panel.current?.querySelector('button')?.focus()
-    function onPointer(event) {
-      const inside = panel.current?.contains(event.target) || pill.current.contains(event.target)
-      if (!inside) setOpen(false)
+    function onPointer(event: PointerEvent) {
+      const target = event.target as Node
+      if (!panel.current?.contains(target) && !trigger.current?.contains(target)) setOpen(false)
     }
-    function onKey(event) {
+    function onKey(event: KeyboardEvent) {
       if (event.key !== 'Escape') return
       setOpen(false)
-      pill.current.focus()
+      trigger.current?.focus()
     }
     document.addEventListener('pointerdown', onPointer)
     document.addEventListener('keydown', onKey)
@@ -36,7 +57,7 @@ export default function RoomDetails({ people, peers, name, roomKey, copied, onCo
   return (
     <div className='room-details'>
       <button
-        ref={pill}
+        ref={trigger}
         className='tool'
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
@@ -58,13 +79,13 @@ export default function RoomDetails({ people, peers, name, roomKey, copied, onCo
           <h2>{presence(people, peers)}</h2>
           <ul className='people'>
             <li>
-              <Avatar names={[name]} size='small' online />
+              <Avatar seed={me} size='small' online />
               <span className='grow'>{name}</span>
               <span className='you'>You</span>
             </li>
             {peers.map((peer) => (
               <li key={peer.id}>
-                <Avatar names={[peer.name]} size='small' online />
+                <Avatar seed={peer.id} size='small' online />
                 <span className='grow'>{peer.name}</span>
               </li>
             ))}
@@ -89,7 +110,7 @@ export default function RoomDetails({ people, peers, name, roomKey, copied, onCo
 }
 
 // "2 people · 1 here": everyone who has been in the room, and who is connected now.
-function presence(people, peers) {
+function presence(people: string[], peers: Peer[]): string {
   const total = people.length + 1
   return `${total} ${total === 1 ? 'person' : 'people'} · ${peers.length + 1} here`
 }

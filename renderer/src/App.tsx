@@ -1,49 +1,67 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useChat } from './useChat.js'
-import { useRooms, roomLabel } from './useRooms.js'
-import { useNativeChrome } from './useNativeChrome.js'
-import { load, save } from './storage.js'
-import Sidebar from './Sidebar.jsx'
-import Conversation, { Empty } from './Conversation.jsx'
-import { NameSheet, JoinSheet } from './Sheets.jsx'
-import Icon from './icons.jsx'
-import Onboarding from './Onboarding.jsx'
-import RoomDetails from './RoomDetails.jsx'
+import { useShallow } from 'zustand/react/shallow'
+import { useChat } from './state/chat.ts'
+import { roomLabel, useSaved } from './state/saved.ts'
+import { useMedia, useNativeChrome, useOnline } from './hooks.ts'
+import Sidebar from './Sidebar.tsx'
+import Conversation, { Empty } from './Conversation.tsx'
+import { NameSheet, JoinSheet } from './Sheets.tsx'
+import Icon from './icons.tsx'
+import Onboarding from './Onboarding.tsx'
+import RoomDetails from './RoomDetails.tsx'
+import type { Peer, SavedRoom, Status } from './types.ts'
 
 const bridge = window.bridge
 
+type Sheet = 'rename' | 'join' | null
+type Pending = 'create' | 'join' | null
+
 export default function App() {
-  const [name, setName] = useState(() => load('name') || '')
-  const [sheet, setSheet] = useState(null)
+  const { name, receipts, rooms } = useSaved(
+    useShallow((s) => ({ name: s.name, receipts: s.receipts, rooms: s.rooms }))
+  )
+  // Only what the window frame needs; the conversation subscribes to the rest
+  // itself, so a new message doesn't re-render the whole window.
+  const chat = useChat(
+    useShallow((s) => ({
+      phase: s.phase,
+      key: s.key,
+      me: s.me,
+      status: s.status,
+      peers: s.peers,
+      joinError: s.joinError,
+      openedAt: s.openedAt
+    }))
+  )
+  const actions = useChat(
+    useShallow((s) => ({
+      start: s.start,
+      join: s.join,
+      leave: s.leave,
+      rename: s.rename,
+      seen: s.seen,
+      restart: s.restart
+    }))
+  )
+
+  const [sheet, setSheet] = useState<Sheet>(null)
   const [onboarding, setOnboarding] = useState(!name)
-  const [pending, setPending] = useState(null) // what to do once onboarding hands over
+  const [pending, setPending] = useState<Pending>(null) // what to do once onboarding hands over
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [copied, setCopied] = useState(false)
-  const [receipts, setReceipts] = useState(() => load('receipts') !== 'off')
   const narrow = useMedia('(max-width: 620px)')
   const online = useOnline()
-  const chat = useChat(name)
-  const { rooms, update, remove } = useRooms()
-  const { state } = chat
-  const inRoom = state.phase === 'room'
-  const current = rooms.find((room) => room.key === state.key)
+  const inRoom = chat.phase === 'room'
+  const current = rooms.find((room) => room.key === chat.key)
   const showSidebar = sidebarOpen && !narrow
 
   useNativeChrome()
 
-  // Remember who was in each room and what was said last, for the sidebar.
+  // Start the worker (and reopen the last room) once we know who the user is.
   useEffect(() => {
-    if (!inRoom) return
-    const messages = state.items.filter((item) => item.kind !== 'notice')
-    const last = messages.at(-1)
-    update(state.key, {
-      people: [
-        ...state.peers.map((peer) => peer.name),
-        ...messages.filter((m) => !m.mine).map((m) => m.name)
-      ],
-      last: last && { text: last.text, name: last.mine ? 'You' : last.name, at: last.at }
-    })
-  }, [inRoom, state.key, state.items, state.peers, update])
+    if (name) actions.start()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Boolean(name)])
 
   useEffect(() => {
     document.title = inRoom ? roomLabel(current) : 'Pear Chat'
@@ -51,30 +69,31 @@ export default function App() {
 
   // A room opening (from the Join sheet or anywhere else) closes the sheet.
   useEffect(() => {
-    if (state.openedAt) setSheet((open) => (open === 'join' ? null : open))
-  }, [state.openedAt])
+    if (chat.openedAt) setSheet((open) => (open === 'join' ? null : open))
+  }, [chat.openedAt])
 
   const copyKey = useCallback(
-    async (key = state.key) => {
+    async (key = chat.key) => {
+      if (!key) return
       await bridge.copy(key)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     },
-    [state.key]
+    [chat.key]
   )
 
   const removeRoom = useCallback(
-    async (room) => {
+    async (room: SavedRoom) => {
       const ok = await bridge.confirm({
         message: `Remove “${roomLabel(room)}”?`,
         detail: 'The room is removed from this Mac. You can only rejoin it with its key.',
         confirm: 'Remove'
       })
       if (!ok) return
-      remove(room.key)
-      if (room.key === state.key) chat.leave()
+      useSaved.getState().removeRoom(room.key)
+      if (room.key === chat.key) actions.leave()
     },
-    [remove, state.key, chat]
+    [chat.key, actions]
   )
 
   const addRoom = useCallback(async () => {
@@ -82,13 +101,19 @@ export default function App() {
       { id: 'new', label: 'New Room' },
       { id: 'join', label: 'Join Room…' }
     ])
-    if (choice === 'new') chat.join(null)
+    if (choice === 'new') actions.join(null)
     if (choice === 'join') setSheet('join')
-  }, [chat])
+  }, [actions])
+
+  function changeName(next: string) {
+    useSaved.getState().setName(next)
+    setSheet(null)
+    if (inRoom) actions.rename(next)
+  }
 
   // Onboarding ends with an action. It runs once the name is set and the
   // worker has started, so the room is created under the new name.
-  function finishOnboarding(next, action) {
+  function finishOnboarding(next: string, action: 'create' | 'join') {
     setOnboarding(false)
     if (next !== name) changeName(next)
     setPending(action)
@@ -96,17 +121,10 @@ export default function App() {
 
   useEffect(() => {
     if (!name || !pending) return
-    if (pending === 'create') chat.join(null)
+    if (pending === 'create') actions.join(null)
     if (pending === 'join') setSheet('join')
     setPending(null)
-  }, [name, pending, chat])
-
-  function changeName(next) {
-    save('name', next)
-    setName(next)
-    setSheet(null)
-    if (inRoom) chat.rename(next)
-  }
+  }, [name, pending, actions])
 
   // The menu bar drives the same actions as the buttons.
   useEffect(() => {
@@ -118,21 +136,19 @@ export default function App() {
       bridge.onMenu((action) => {
         if (action === 'welcome') setOnboarding(true)
         if (action === 'toggle-receipts') {
-          setReceipts((on) => {
-            save('receipts', on ? 'off' : 'on')
-            if (!on) setTimeout(chat.seen) // turning them on reports what you've read
-            return !on
-          })
+          const on = !useSaved.getState().receipts
+          useSaved.getState().setReceipts(on)
+          if (on) actions.seen() // turning them on reports what you've read
         }
         if (!name) return
-        if (action === 'new-room') chat.join(null)
+        if (action === 'new-room') actions.join(null)
         if (action === 'join-room') setSheet('join')
         if (action === 'rename') setSheet('rename')
         if (action === 'toggle-sidebar') setSidebarOpen((open) => !open)
         if (action === 'copy-key' && inRoom) copyKey()
         if (action === 'remove-room' && current) removeRoom(current)
       }),
-    [name, chat, inRoom, current, copyKey, removeRoom]
+    [name, actions, inRoom, current, copyKey, removeRoom]
   )
 
   return (
@@ -140,18 +156,10 @@ export default function App() {
       <div className={'app' + (showSidebar ? '' : ' sidebar-hidden')} inert={onboarding}>
         {showSidebar && (
           <Sidebar
-            rooms={rooms}
-            current={state.key}
-            onSelect={(key) => key !== state.key && chat.join(key)}
-            peers={inRoom ? state.peers : []}
-            status={state.status}
             online={online}
-            name={name}
-            joinError={state.joinError}
+            onAdd={addRoom}
             onCopy={copyKey}
             onRemove={removeRoom}
-            onAdd={addRoom}
-            onJoinKey={(key) => chat.join(key, { switching: false })}
             onRename={() => setSheet('rename')}
             onWelcome={() => setOnboarding(true)}
             onHide={() => setSidebarOpen(false)}
@@ -172,14 +180,15 @@ export default function App() {
             )}
             <div className='title'>
               <h1>{inRoom ? roomLabel(current) : 'Pear Chat'}</h1>
-              {inRoom && <Status status={state.status} peers={state.peers} online={online} />}
+              {inRoom && <RoomStatus status={chat.status} peers={chat.peers} online={online} />}
             </div>
-            {inRoom && (
+            {inRoom && chat.key && (
               <RoomDetails
-                people={current?.people || []}
-                peers={state.peers}
+                people={current?.people ?? []}
+                peers={chat.peers}
                 name={name}
-                roomKey={state.key}
+                me={chat.me}
+                roomKey={chat.key}
                 copied={copied}
                 onCopy={() => copyKey()}
                 onRemove={() => current && removeRoom(current)}
@@ -190,11 +199,11 @@ export default function App() {
             </span>
           </header>
 
-          {state.phase === 'crashed' ? (
+          {chat.phase === 'crashed' ? (
             <Empty
               title='Connection Stopped'
               action={
-                <button className='default' onClick={chat.restart}>
+                <button className='default' onClick={actions.restart}>
                   Restart
                 </button>
               }
@@ -204,15 +213,11 @@ export default function App() {
             </Empty>
           ) : inRoom ? (
             <Conversation
-              state={state}
-              people={current?.people}
+              people={current?.people ?? []}
               online={online}
-              onSend={chat.send}
-              onTyping={chat.typing}
-              onSeen={chat.seen}
               onCopyKey={() => copyKey()}
             />
-          ) : state.phase === 'joining' ? (
+          ) : chat.phase === 'joining' ? (
             <div className='content-fill' aria-busy='true' />
           ) : (
             <Empty
@@ -220,7 +225,7 @@ export default function App() {
               action={
                 <div className='buttons'>
                   <button onClick={() => setSheet('join')}>Join Room…</button>
-                  <button className='default' onClick={() => chat.join(null)}>
+                  <button className='default' onClick={() => actions.join(null)}>
                     New Room
                   </button>
                 </div>
@@ -236,8 +241,8 @@ export default function App() {
         )}
         {sheet === 'join' && (
           <JoinSheet
-            error={state.joinError}
-            onJoin={(key) => chat.join(key, { switching: false })}
+            error={chat.joinError}
+            onJoin={(key) => actions.join(key, { switching: false })}
             onCancel={() => setSheet(null)}
           />
         )}
@@ -247,7 +252,8 @@ export default function App() {
   )
 }
 
-function Status({ status, peers, online }) {
+// The one place that says how the open room is doing.
+function RoomStatus({ status, peers, online }: { status: Status; peers: Peer[]; online: boolean }) {
   const { tone, label } = !online
     ? { tone: 'off', label: 'Offline' }
     : status === 'connected'
@@ -264,29 +270,4 @@ function Status({ status, peers, online }) {
       {label}
     </p>
   )
-}
-
-function useOnline() {
-  const [online, setOnline] = useState(navigator.onLine)
-  useEffect(() => {
-    const update = () => setOnline(navigator.onLine)
-    window.addEventListener('online', update)
-    window.addEventListener('offline', update)
-    return () => {
-      window.removeEventListener('online', update)
-      window.removeEventListener('offline', update)
-    }
-  }, [])
-  return online
-}
-
-function useMedia(query) {
-  const [matches, setMatches] = useState(() => window.matchMedia(query).matches)
-  useEffect(() => {
-    const list = window.matchMedia(query)
-    const update = () => setMatches(list.matches)
-    list.addEventListener('change', update)
-    return () => list.removeEventListener('change', update)
-  }, [query])
-  return matches
 }
